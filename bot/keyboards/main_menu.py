@@ -1,6 +1,5 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -16,6 +15,5 @@ main_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="📜 Соглашение")
         ]
     ],
-    resize_keyboard=True,
-    input_field_placeholder="Выберите действие 👇"
+    resize_keyboard=True
 )
