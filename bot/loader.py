@@ -7,6 +7,8 @@ from bot.handlers.profile import router as profile_router
 from bot.handlers.agreement import router as agreement_router
 from bot.handlers.menu import router as menu_router
 from bot.handlers.about import router as about_router
+from bot.handlers.help import router as help_router
+
 
 def setup_routers(dp: Dispatcher):
     # 🔥 порядок важен
@@ -16,4 +18,5 @@ def setup_routers(dp: Dispatcher):
 
     dp.include_router(agreement_router)
     dp.include_router(about_router)
+    dp.include_router(help_router)
     dp.include_router(menu_router)
