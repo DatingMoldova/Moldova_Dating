@@ -2,7 +2,12 @@ import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-REQUIRED_CHANNEL = int(os.getenv("REQUIRED_CHANNEL"))
-LOG_CHANNEL = int(os.getenv("LOG_CHANNEL"))
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+REQUIRED_CHANNEL = os.getenv("REQUIRED_CHANNEL")  # @channel или id
 CHANNEL_LINK = os.getenv("CHANNEL_LINK")
+
 BOT_USERNAME = os.getenv("BOT_USERNAME")
+
+# 🔥 админ через Railway
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
