@@ -1,18 +1,22 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-gender_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="👨 Мужчина"), KeyboardButton(text="👩 Женщина")],
-        [KeyboardButton(text="👫 Пара"), KeyboardButton(text="⚧ Би")]
-    ],
-    resize_keyboard=True
+# 🚻 ПОЛ
+gender_kb = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="👨 Мужчина", callback_data="g_male")],
+        [InlineKeyboardButton(text="👩 Женщина", callback_data="g_female")],
+        [InlineKeyboardButton(text="👫 Пара", callback_data="g_pair")],
+        [InlineKeyboardButton(text="⚧ Би", callback_data="g_bi")]
+    ]
 )
 
-search_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="👨 Мужчину"), KeyboardButton(text="👩 Девушку")],
-        [KeyboardButton(text="👫 Пару"), KeyboardButton(text="⚧ Би")],
-        [KeyboardButton(text="🌍 Всех")]
-    ],
-    resize_keyboard=True
+# ❤️ КОГО ИЩЕШЬ
+search_kb = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="👨 Мужчину", callback_data="s_male")],
+        [InlineKeyboardButton(text="👩 Девушку", callback_data="s_female")],
+        [InlineKeyboardButton(text="👫 Пару", callback_data="s_pair")],
+        [InlineKeyboardButton(text="⚧ Би", callback_data="s_bi")],
+        [InlineKeyboardButton(text="🌍 Всех", callback_data="s_all")]
+    ]
 )
