@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from bot.db import save_user
 from bot.keyboards.main_menu import main_menu
-from bot.keyboards.register_kb import gender_kb, search_kb, back_kb
+from bot.keyboards.register_kb import gender_kb, search_kb, back_kb, confirm_kb
 
 router = Router()
 
@@ -151,7 +151,7 @@ async def reg_about(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 📸 фото (🔥 ИСПРАВЛЕНО)
+# 📸 фото → ПОКАЗ АНКЕТЫ
 @router.message(Reg.photo)
 async def reg_photo(message: Message, state: FSMContext):
     if not message.photo:
@@ -162,25 +162,60 @@ async def reg_photo(message: Message, state: FSMContext):
 
     photo = message.photo[-1].file_id
 
+    await state.update_data(photo=photo)
+
+    text = (
+        f"👤 {data.get('name')}, {data.get('age')}\n"
+        f"📍 {data.get('city')}\n\n"
+        f"{data.get('gender')} → {data.get('search')}\n\n"
+        f"📝 {data.get('about')}"
+    )
+
+    await message.answer_photo(
+        photo=photo,
+        caption=text,
+        reply_markup=confirm_kb()
+    )
+
+    await message.delete()
+
+
+# ✅ подтвердить
+@router.callback_query(F.data == "confirm_yes")
+async def confirm_yes(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
     save_user(
-        message.from_user.id,
+        call.from_user.id,
         data.get("name"),
         data.get("age"),
         data.get("city"),
         data.get("gender"),
         data.get("search"),
         data.get("about"),
-        photo,
-        message.from_user.username,
+        data.get("photo"),
+        call.from_user.username,
         None
     )
 
-    # ❗ НЕ редактируем — отправляем новое сообщение
-    await message.answer("✅ Анкета создана!")
+    await call.message.delete()
 
-    await message.answer("Главное меню 👇", reply_markup=main_menu)
+    await call.message.answer("✅ Анкета сохранена!", reply_markup=main_menu)
 
     await state.clear()
+
+
+# ❌ заново
+@router.callback_query(F.data == "confirm_no")
+async def confirm_no(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await call.message.delete()
+
+    await call.message.answer("🔄 Начнём заново")
+
+    from bot.handlers.register import start_reg
+    await start_reg(call.message, state)
 
 
 # ⬅️ назад
@@ -190,7 +225,7 @@ async def go_back(call: CallbackQuery, state: FSMContext):
 
     if current == Reg.age.state:
         await state.set_state(Reg.name)
-        await call.message.edit_text(step("👤 Введите ваше имя:", 1))
+        await call.message.edit_text(step("👤 Введите имя:", 1))
 
     elif current == Reg.city.state:
         await state.set_state(Reg.age)
