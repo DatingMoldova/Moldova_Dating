@@ -1,7 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.agree_kb import agree_kb
 
 router = Router()
 
