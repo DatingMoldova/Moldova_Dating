@@ -16,10 +16,8 @@ from bot.handlers.menu import router as menu_router
 async def main():
     logging.basicConfig(level=logging.INFO)
 
-    # БД
     init_db()
 
-    # БОТ (НОВЫЙ СПОСОБ)
     bot = Bot(
         token=BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -27,12 +25,10 @@ async def main():
 
     dp = Dispatcher()
 
-    # Роутеры
     dp.include_router(start_router)
     dp.include_router(register_router)
     dp.include_router(menu_router)
 
-    # ВАЖНО (иначе бот молчит)
     await bot.delete_webhook(drop_pending_updates=True)
 
     print("🚀 Бот запущен")
