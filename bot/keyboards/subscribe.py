@@ -1,9 +1,9 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-def subscribe_kb(channel_link):
+def subscribe_kb(link):
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📢 Подписаться", url=channel_link)],
+            [InlineKeyboardButton(text="📢 Подписаться", url=link)],
             [InlineKeyboardButton(text="✅ Проверить", callback_data="check_sub")]
         ]
     )
