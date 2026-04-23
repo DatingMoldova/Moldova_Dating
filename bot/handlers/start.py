@@ -8,6 +8,7 @@ from bot.utils.check_sub import check_subscription
 from bot.keyboards.subscribe import subscribe_kb
 from bot.handlers.register import start_register
 from bot.db import get_user
+from bot.keyboards.main_menu import main_menu
 
 router = Router()
 
@@ -40,7 +41,10 @@ async def start_handler(message: Message, state: FSMContext, bot):
     user = get_user(user_id)
 
     if user:
-        await message.answer("Ты уже зарегистрирован 👌")
+        await message.answer(
+            "Ты уже зарегистрирован 👌",
+            reply_markup=main_menu
+        )
         return
 
     await start_register(message, state)
@@ -53,7 +57,17 @@ async def check_sub_callback(call: CallbackQuery, state: FSMContext, bot):
     is_sub = await check_subscription(bot, user_id, REQUIRED_CHANNEL)
 
     if is_sub:
-        await call.message.answer("✅ Подписка подтверждена! Давай начнем регистрацию 👇")
-        await start_register(call.message, state)
+        user = get_user(user_id)
+
+        if user:
+            await call.message.answer(
+                "✅ Ты уже зарегистрирован 👌",
+                reply_markup=main_menu
+            )
+        else:
+            await call.message.answer(
+                "✅ Подписка подтверждена! Давай начнем регистрацию 👇"
+            )
+            await start_register(call.message, state)
     else:
         await call.answer("❌ Ты ещё не подписан", show_alert=True)
