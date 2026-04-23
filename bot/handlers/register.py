@@ -88,7 +88,7 @@ async def reg_city(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 🚻 пол (INLINE)
+# 🚻 пол
 @router.callback_query(Reg.gender)
 async def reg_gender(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -111,7 +111,7 @@ async def reg_gender(call: CallbackQuery, state: FSMContext):
     await state.set_state(Reg.search)
 
 
-# ❤️ поиск (INLINE)
+# ❤️ поиск
 @router.callback_query(Reg.search)
 async def reg_search(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -151,7 +151,7 @@ async def reg_about(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 📸 фото (🔥 СТАБИЛЬНЫЙ ВАРИАНТ)
+# 📸 фото (🔥 ИСПРАВЛЕНО)
 @router.message(Reg.photo)
 async def reg_photo(message: Message, state: FSMContext):
     if not message.photo:
@@ -164,27 +164,23 @@ async def reg_photo(message: Message, state: FSMContext):
 
     save_user(
         message.from_user.id,
-        data["name"],
-        data["age"],
-        data["city"],
-        data["gender"],
-        data["search"],
-        data["about"],
+        data.get("name"),
+        data.get("age"),
+        data.get("city"),
+        data.get("gender"),
+        data.get("search"),
+        data.get("about"),
         photo,
         message.from_user.username,
         None
     )
 
-    await message.bot.edit_message_text(
-        "✅ Анкета создана!",
-        chat_id=message.chat.id,
-        message_id=data["msg_id"]
-    )
+    # ❗ НЕ редактируем — отправляем новое сообщение
+    await message.answer("✅ Анкета создана!")
 
     await message.answer("Главное меню 👇", reply_markup=main_menu)
 
     await state.clear()
-    await message.delete()
 
 
 # ⬅️ назад
