@@ -12,7 +12,6 @@ cursor = conn.cursor()
 
 # 🔥 СОЗДАНИЕ ТАБЛИЦ
 def init_db():
-    # 👤 пользователи
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -44,7 +43,6 @@ def init_db():
         )
     """)
 
-    # 🖼 галерея (до 5 фото)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS photos (
             id SERIAL PRIMARY KEY,
@@ -100,7 +98,7 @@ def toggle_active(user_id, status: bool):
     conn.commit()
 
 
-# 🗑 УДАЛИТЬ АНКЕТУ
+# 🗑 УДАЛИТЬ ПОЛЬЗОВАТЕЛЯ
 def delete_user(user_id):
     cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
     cursor.execute("DELETE FROM photos WHERE user_id = %s", (user_id,))
@@ -161,7 +159,10 @@ def delete_photo(photo_id):
     conn.commit()
 
 
-# ⭐ СДЕЛАТЬ ГЛАВНЫМ
+# ⭐ СДЕЛАТЬ ГЛАВНЫМ (🔥 ИСПРАВЛЕНО)
 def set_main_photo(user_id, file_id):
     cursor.execute(
-        "UPDATE users SET photo = %s WHERE user_id = %
+        "UPDATE users SET photo = %s WHERE user_id = %s",
+        (file_id, user_id)
+    )
+    conn.commit()
