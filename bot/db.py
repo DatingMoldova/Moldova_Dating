@@ -1,8 +1,24 @@
 import psycopg2
 import os
 
-conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-cursor = conn.cursor()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# ❌ если нет DATABASE_URL — сразу понятная ошибка
+if not DATABASE_URL:
+    raise ValueError("❌ DATABASE_URL не найден в переменных окружения")
+
+# 🔥 фикс для Railway
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+try:
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    print("✅ БД подключена")
+except Exception as e:
+    print("❌ Ошибка подключения к БД:", e)
+    raise
+
 
 def init_db():
     cursor.execute("""
@@ -56,24 +72,9 @@ def save_user(user_id, name, age, city, gender, search, about, photo, username, 
     conn.commit()
 
 
-def add_referral(referrer_id, new_user_id):
-    cursor.execute("SELECT is_counted FROM users WHERE user_id = %s", (new_user_id,))
-    res = cursor.fetchone()
-
-    if res and res[0]:
-        return
-
-    cursor.execute("""
-    UPDATE users
-    SET invites = invites + 1,
-        balance = balance + 10
-    WHERE user_id = %s
-    """, (referrer_id,))
-
-    cursor.execute("UPDATE users SET is_counted = TRUE WHERE user_id = %s", (new_user_id,))
-    conn.commit()
-
-
 def toggle_active(user_id, status):
-    cursor.execute("UPDATE users SET is_active = %s WHERE user_id = %s", (status, user_id))
+    cursor.execute(
+        "UPDATE users SET is_active = %s WHERE user_id = %s",
+        (status, user_id)
+    )
     conn.commit()
