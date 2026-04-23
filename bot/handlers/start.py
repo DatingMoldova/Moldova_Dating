@@ -1,15 +1,17 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 
 from bot.db import get_user
+from bot.handlers.register import Reg
 
 router = Router()
 
 
 @router.message(Command("start"))
-async def start(message: Message):
-    print("START OK")
+async def start(message: Message, state: FSMContext):
+    print("START WORKING")
 
     user = get_user(message.from_user.id)
 
@@ -17,5 +19,5 @@ async def start(message: Message):
         from bot.keyboards.main_menu import main_menu
         await message.answer("Добро пожаловать 👇", reply_markup=main_menu)
     else:
-        from bot.handlers.register import start_register
-        await start_register(message)
+        await message.answer("Как тебя зовут?")
+        await state.set_state(Reg.name)
