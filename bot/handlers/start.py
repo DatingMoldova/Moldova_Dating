@@ -8,7 +8,6 @@ from bot.db import get_user
 router = Router()
 
 
-# 🔥 проверка подписки
 async def check_sub(bot, user_id):
     try:
         member = await bot.get_chat_member(REQUIRED_CHANNEL, user_id)
@@ -17,14 +16,12 @@ async def check_sub(bot, user_id):
         return False
 
 
-# 🔥 /start (ПРАВИЛЬНЫЙ ФИЛЬТР!)
 @router.message(Command("start"))
 async def start(message: Message, bot):
-    print("START WORKS")  # 👈 проверка в логах
+    print("START OK")
 
     user = get_user(message.from_user.id)
 
-    # проверка подписки
     if not await check_sub(bot, message.from_user.id):
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📢 Подписаться", url=CHANNEL_LINK)],
@@ -33,16 +30,14 @@ async def start(message: Message, bot):
         await message.answer("Подпишись на канал 👇", reply_markup=kb)
         return
 
-    # если уже есть анкета
     if user:
         from bot.keyboards.main_menu import main_menu
-        await message.answer("Ты уже зарегистрирован 👇", reply_markup=main_menu)
+        await message.answer("Добро пожаловать 👇", reply_markup=main_menu)
     else:
         from bot.handlers.register import start_register
         await start_register(message)
 
 
-# 🔥 кнопка "проверить подписку"
 @router.callback_query(lambda c: c.data == "check_sub")
 async def check_again(call: CallbackQuery, bot):
     if await check_sub(bot, call.from_user.id):
@@ -50,4 +45,4 @@ async def check_again(call: CallbackQuery, bot):
         await call.message.answer("✅ Подписка есть, начинаем регистрацию")
         await start_register(call.message)
     else:
-        await call.answer("❌ Сначала подпишись", show_alert=True)
+        await call.answer("❌ Подпишись сначала", show_alert=True)
