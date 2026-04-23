@@ -5,7 +5,6 @@ from aiogram.fsm.context import FSMContext
 
 from bot.db import (
     get_user,
-    toggle_active,
     update_user_field,
     delete_user,
     add_photo,
@@ -14,7 +13,7 @@ from bot.db import (
     set_main_photo
 )
 
-from bot.keyboards.profile_kb import profile_kb, edit_kb
+from bot.keyboards.profile_kb import profile_kb, edit_kb, confirm_delete_kb
 from bot.keyboards.gallery_kb import gallery_main_kb, photo_actions_kb
 
 router = Router()
@@ -57,40 +56,38 @@ async def my_profile(message: Message):
     await message.answer_photo(
         photo=user[8],
         caption=text,
-        reply_markup=profile_kb(user[16])
+        reply_markup=profile_kb()
     )
 
 
 # =========================
-# 🙈 АКТИВНОСТЬ
-# =========================
-
-@router.callback_query(F.data == "toggle_profile")
-async def toggle_profile_handler(call: CallbackQuery):
-    await call.answer()
-
-    user = get_user(call.from_user.id)
-    new_status = not user[16]
-
-    toggle_active(call.from_user.id, new_status)
-
-    await call.message.edit_reply_markup(
-        reply_markup=profile_kb(new_status)
-    )
-
-
-# =========================
-# 🗑 УДАЛИТЬ АНКЕТУ
+# 🗑 УДАЛЕНИЕ (С ПОДТВЕРЖДЕНИЕМ)
 # =========================
 
 @router.callback_query(F.data == "delete_profile")
-async def delete_profile_handler(call: CallbackQuery):
+async def delete_profile_start(call: CallbackQuery):
+    await call.answer()
+
+    await call.message.answer(
+        "❗ Вы точно хотите удалить анкету?",
+        reply_markup=confirm_delete_kb()
+    )
+
+
+@router.callback_query(F.data == "confirm_delete")
+async def confirm_delete(call: CallbackQuery):
     await call.answer()
 
     delete_user(call.from_user.id)
 
     await call.message.delete()
     await call.message.answer("🗑 Анкета удалена. Напишите /start")
+
+
+@router.callback_query(F.data == "cancel_delete")
+async def cancel_delete(call: CallbackQuery):
+    await call.answer("Отмена")
+    await call.message.delete()
 
 
 # =========================
