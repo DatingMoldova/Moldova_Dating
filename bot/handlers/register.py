@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -14,23 +14,20 @@ class Reg(StatesGroup):
     age = State()
 
 
-async def start_register(message: Message, state: FSMContext = None):
-    await message.answer("Как тебя зовут?")
-    if state:
-        await state.set_state(Reg.name)
-
-
+# 👤 ИМЯ
 @router.message(Reg.name)
-async def name(message: Message, state: FSMContext):
+async def reg_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
+
     await message.answer("Сколько тебе лет?")
     await state.set_state(Reg.age)
 
 
+# 🎂 ВОЗРАСТ
 @router.message(Reg.age)
-async def age(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("Введите число")
+async def reg_age(message: Message, state: FSMContext):
+    if not message.text.isdigit() or int(message.text) < 16:
+        await message.answer("Только 16+")
         return
 
     data = await state.get_data()
@@ -39,14 +36,14 @@ async def age(message: Message, state: FSMContext):
         message.from_user.id,
         data["name"],
         int(message.text),
-        "Город",
-        "Не указано",
-        "Не указано",
-        "Нет описания",
+        "Не указан",
+        "Не указан",
+        "Не указан",
+        "Без описания",
         None,
         message.from_user.username,
         None
     )
 
-    await message.answer("✅ Готово", reply_markup=main_menu)
+    await message.answer("✅ Регистрация завершена", reply_markup=main_menu)
     await state.clear()
