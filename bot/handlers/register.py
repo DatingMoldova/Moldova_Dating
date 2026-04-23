@@ -20,7 +20,6 @@ class Reg(StatesGroup):
     photo = State()
 
 
-# 🔢 прогресс
 def step(text, num):
     return f"📋 Шаг {num}/6\n\n{text}"
 
@@ -40,7 +39,7 @@ async def reg_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
 
     await message.bot.edit_message_text(
-        step("🎂 Введите ваш возраст (16+):", 2),
+        step("🎂 Введите возраст (16+):", 2),
         chat_id=message.chat.id,
         message_id=data["msg_id"],
         reply_markup=back_kb()
@@ -61,7 +60,7 @@ async def reg_age(message: Message, state: FSMContext):
     await state.update_data(age=int(message.text))
 
     await message.bot.edit_message_text(
-        step("📍 Введите ваш город:", 3),
+        step("📍 Введите город:", 3),
         chat_id=message.chat.id,
         message_id=data["msg_id"],
         reply_markup=back_kb()
@@ -91,6 +90,8 @@ async def reg_city(message: Message, state: FSMContext):
 # 🚻 пол
 @router.callback_query(Reg.gender)
 async def reg_gender(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
     mapping = {
         "g_male": "👨 Мужчина",
         "g_female": "👩 Женщина",
@@ -114,6 +115,8 @@ async def reg_gender(call: CallbackQuery, state: FSMContext):
 # ❤️ поиск
 @router.callback_query(Reg.search)
 async def reg_search(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
     mapping = {
         "s_male": "👨 Мужчину",
         "s_female": "👩 Девушку",
@@ -151,7 +154,7 @@ async def reg_about(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 📸 фото → ПОКАЗ АНКЕТЫ
+# 📸 фото → ПРЕДПРОСМОТР
 @router.message(Reg.photo)
 async def reg_photo(message: Message, state: FSMContext):
     if not message.photo:
@@ -161,7 +164,6 @@ async def reg_photo(message: Message, state: FSMContext):
     data = await state.get_data()
 
     photo = message.photo[-1].file_id
-
     await state.update_data(photo=photo)
 
     text = (
@@ -183,33 +185,43 @@ async def reg_photo(message: Message, state: FSMContext):
 # ✅ подтвердить
 @router.callback_query(F.data == "confirm_yes")
 async def confirm_yes(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
+    await call.answer()
 
-    save_user(
-        call.from_user.id,
-        data.get("name"),
-        data.get("age"),
-        data.get("city"),
-        data.get("gender"),
-        data.get("search"),
-        data.get("about"),
-        data.get("photo"),
-        call.from_user.username,
-        None
-    )
+    try:
+        data = await state.get_data()
 
-    await call.message.delete()
+        save_user(
+            call.from_user.id,
+            data.get("name"),
+            data.get("age"),
+            data.get("city"),
+            data.get("gender"),
+            data.get("search"),
+            data.get("about"),
+            data.get("photo"),
+            call.from_user.username,
+            None
+        )
 
-    await call.message.answer("✅ Анкета сохранена!", reply_markup=main_menu)
+        await call.message.delete()
 
-    await state.clear()
+        await call.message.answer(
+            "✅ Анкета сохранена!",
+            reply_markup=main_menu
+        )
+
+        await state.clear()
+
+    except Exception as e:
+        await call.message.answer(f"❌ Ошибка: {e}")
 
 
 # ❌ заново
 @router.callback_query(F.data == "confirm_no")
 async def confirm_no(call: CallbackQuery, state: FSMContext):
-    await state.clear()
+    await call.answer()
 
+    await state.clear()
     await call.message.delete()
 
     await call.message.answer("🔄 Начнём заново")
@@ -221,6 +233,8 @@ async def confirm_no(call: CallbackQuery, state: FSMContext):
 # ⬅️ назад
 @router.callback_query(F.data == "back")
 async def go_back(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+
     current = await state.get_state()
 
     if current == Reg.age.state:
