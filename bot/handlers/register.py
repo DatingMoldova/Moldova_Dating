@@ -54,6 +54,7 @@ async def reg_name(message: Message, state: FSMContext):
 @router.message(Reg.age)
 async def reg_age(message: Message, state: FSMContext):
     if not message.text.isdigit() or int(message.text) < 16:
+        await message.answer("❌ Введите корректный возраст (16+)")
         return
 
     data = await state.get_data()
@@ -87,7 +88,7 @@ async def reg_city(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 🚻 пол
+# 🚻 пол (INLINE)
 @router.callback_query(Reg.gender)
 async def reg_gender(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -97,7 +98,10 @@ async def reg_gender(call: CallbackQuery, state: FSMContext):
         "g_bi": "⚧ Би"
     }
 
-    await state.update_data(gender=mapping.get(call.data))
+    if call.data not in mapping:
+        return
+
+    await state.update_data(gender=mapping[call.data])
 
     await call.message.edit_text(
         step("❤️ Кого ищете:", 5),
@@ -107,7 +111,7 @@ async def reg_gender(call: CallbackQuery, state: FSMContext):
     await state.set_state(Reg.search)
 
 
-# ❤️ поиск
+# ❤️ поиск (INLINE)
 @router.callback_query(Reg.search)
 async def reg_search(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -118,7 +122,10 @@ async def reg_search(call: CallbackQuery, state: FSMContext):
         "s_all": "🌍 Всех"
     }
 
-    await state.update_data(search=mapping.get(call.data))
+    if call.data not in mapping:
+        return
+
+    await state.update_data(search=mapping[call.data])
 
     await call.message.edit_text(
         step("📝 Напишите о себе:", 6),
@@ -144,10 +151,16 @@ async def reg_about(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 📸 фото
-@router.message(Reg.photo, F.photo)
+# 📸 фото (🔥 СТАБИЛЬНЫЙ ВАРИАНТ)
+@router.message(Reg.photo)
 async def reg_photo(message: Message, state: FSMContext):
+    if not message.photo:
+        await message.answer("❌ Отправьте фото")
+        return
+
     data = await state.get_data()
+
+    photo = message.photo[-1].file_id
 
     save_user(
         message.from_user.id,
@@ -157,7 +170,7 @@ async def reg_photo(message: Message, state: FSMContext):
         data["gender"],
         data["search"],
         data["about"],
-        message.photo[-1].file_id,
+        photo,
         message.from_user.username,
         None
     )
@@ -179,22 +192,22 @@ async def reg_photo(message: Message, state: FSMContext):
 async def go_back(call: CallbackQuery, state: FSMContext):
     current = await state.get_state()
 
-    if current == Reg.age:
+    if current == Reg.age.state:
         await state.set_state(Reg.name)
         await call.message.edit_text(step("👤 Введите ваше имя:", 1))
 
-    elif current == Reg.city:
+    elif current == Reg.city.state:
         await state.set_state(Reg.age)
-        await call.message.edit_text(step("🎂 Введите возраст:", 2))
+        await call.message.edit_text(step("🎂 Введите возраст:", 2), reply_markup=back_kb())
 
-    elif current == Reg.gender:
+    elif current == Reg.gender.state:
         await state.set_state(Reg.city)
-        await call.message.edit_text(step("📍 Введите город:", 3))
+        await call.message.edit_text(step("📍 Введите город:", 3), reply_markup=back_kb())
 
-    elif current == Reg.search:
+    elif current == Reg.search.state:
         await state.set_state(Reg.gender)
         await call.message.edit_text(step("🚻 Выберите пол:", 4), reply_markup=gender_kb())
 
-    elif current == Reg.about:
+    elif current == Reg.about.state:
         await state.set_state(Reg.search)
         await call.message.edit_text(step("❤️ Кого ищете:", 5), reply_markup=search_kb())
