@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
@@ -20,10 +20,9 @@ class Reg(StatesGroup):
     photo = State()
 
 
-# 🔥 СТАРТ РЕГИСТРАЦИИ
+# 🚀 СТАРТ РЕГИСТРАЦИИ
 async def start_reg(message: Message, state: FSMContext):
     msg = await message.answer("👤 Введите ваше имя:")
-
     await state.update_data(msg_id=msg.message_id)
     await state.set_state(Reg.name)
 
@@ -64,20 +63,27 @@ async def reg_age(message: Message, state: FSMContext):
     await message.delete()
 
 
-# 📍 ГОРОД
+# 📍 ГОРОД (🔥 ИСПРАВЛЕНО)
 @router.message(Reg.city)
 async def reg_city(message: Message, state: FSMContext):
     data = await state.get_data()
     await state.update_data(city=message.text)
 
-    await message.bot.edit_message_text(
-        "🚻 Выберите пол:",
+    # ❗ удаляем старое сообщение (fix зависания)
+    await message.bot.delete_message(
         chat_id=message.chat.id,
-        message_id=data["msg_id"],
+        message_id=data["msg_id"]
+    )
+
+    # ❗ отправляем новое (стабильно)
+    msg = await message.answer(
+        "🚻 Выберите пол:",
         reply_markup=gender_kb
     )
 
+    await state.update_data(msg_id=msg.message_id)
     await state.set_state(Reg.gender)
+
     await message.delete()
 
 
@@ -104,7 +110,7 @@ async def reg_search(message: Message, state: FSMContext):
     await state.update_data(search=message.text)
 
     await message.bot.edit_message_text(
-        "📝 Напишите немного о себе:",
+        "📝 Напишите о себе:",
         chat_id=message.chat.id,
         message_id=data["msg_id"]
     )
