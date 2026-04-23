@@ -14,18 +14,14 @@ async def my_profile(message: Message):
         await message.answer("❌ У вас нет анкеты. Напишите /start")
         return
 
-    try:
-        text = (
-            f"👤 {user[1]}, {user[2]}\n"
-            f"📍 {user[3]}\n\n"
-            f"{user[4]} → {user[5]}\n\n"
-            f"📝 {user[6]}"
-        )
+    text = (
+        f"👤 {user[2]}, {user[3]}\n"
+        f"📍 {user[4]}\n\n"
+        f"{user[5]} → {user[6]}\n\n"
+        f"📝 {user[7]}"
+    )
 
-        await message.answer_photo(
-            photo=user[7],
-            caption=text
-        )
-
-    except Exception as e:
-        await message.answer(f"❌ Ошибка профиля: {e}")
+    await message.answer_photo(
+        photo=user[8],
+        caption=text
+    )
