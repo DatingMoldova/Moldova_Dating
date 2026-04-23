@@ -1,33 +1,89 @@
-import asyncio
-import logging
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
+from bot.db import get_user
+from bot.keyboards.profile_kb import profile_kb
+from bot.keyboards.gallery_kb import gallery_kb
+from bot.config import BOT_USERNAME
 
-from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-
-from bot.config import BOT_TOKEN
-from bot.db import init_db
-
-from bot.handlers.start import router as start_router
-from bot.handlers.register import router as register_router
-from bot.handlers.menu import router as menu_router
+router = Router()
 
 
-async def main():
-    logging.basicConfig(level=logging.INFO)
+@router.message(F.text == "👤 Моя анкета")
+async def profile(message: Message, bot):
+    user = get_user(message.from_user.id)
 
-    init_db()
+    if not user:
+        await message.answer("Нет анкеты")
+        return
 
-    bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
-    dp = Dispatcher()
+    (_, _, name, age, city, gender, search, about,
+     photo, _, _, invites, balance,
+     _, likes, views, _, is_active) = user
 
-    dp.include_router(start_router)
-    dp.include_router(register_router)
-    dp.include_router(menu_router)
+    text = f"""
+💖 {name}, {age}
+📍 {city}
 
-    print("🚀 Бот запущен")
+🚻 {gender}
+❤️ {search}
 
-    await dp.start_polling(bot)
+📝 {about}
+
+⭐ {likes*2 + views}
+"""
+
+    await bot.send_photo(message.chat.id, photo, caption=text, reply_markup=profile_kb(is_active))
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# ===== ГАЛЕРЕЯ =====
+
+@router.callback_query(F.data == "gallery")
+async def gallery(call: CallbackQuery):
+    await call.message.answer("📸 Галерея", reply_markup=gallery_kb())
+
+
+# ===== РЕФЕРАЛКА =====
+
+@router.callback_query(F.data == "invite")
+async def invite(call: CallbackQuery):
+    link = f"https://t.me/{BOT_USERNAME}?start={call.from_user.id}"
+    await call.message.answer(f"Твоя ссылка:\n{link}")
+
+
+# ===== СКРЫТЬ =====
+
+@router.callback_query(F.data == "toggle_profile")
+async def toggle(call: CallbackQuery):
+    from bot.db import toggle_active
+    user = get_user(call.from_user.id)
+    new = not user[17]
+    toggle_active(call.from_user.id, new)
+
+    await call.message.answer("Статус обновлен")
+
+
+# ===== ЗАГЛУШКИ =====
+
+@router.message(F.text == "🔥 Смотреть анкеты")
+async def search(message: Message):
+    await message.answer("Скоро будет 🔥")
+
+
+@router.message(F.text == "⭐ Премиум")
+async def premium(message: Message):
+    await message.answer("Премиум скоро 💎")
+
+
+@router.message(F.text == "🆘 Помощь")
+async def help(message: Message):
+    await message.answer("Напиши админу")
+
+
+@router.message(F.text == "ℹ️ О нас")
+async def about(message: Message):
+    await message.answer("Moldova Dating 🇲🇩")
+
+
+@router.message(F.text == "📄 Правила")
+async def rules(message: Message):
+    await message.answer("Правила скоро")
