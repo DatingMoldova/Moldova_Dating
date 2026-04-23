@@ -12,7 +12,7 @@ from bot.handlers.start import router as start_router
 from bot.handlers.register import router as register_router
 from bot.handlers.menu import router as menu_router
 from bot.handlers.admin import router as admin_router
-
+from bot.handlers.profile import router as profile_router
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -34,6 +34,7 @@ async def main():
     dp.include_router(register_router)
     dp.include_router(menu_router)
     dp.include_router(admin_router)
+    dp.include_router(profile_router)
 
     # 🔥 фикс "бот не отвечает"
     await bot.delete_webhook(drop_pending_updates=True)
