@@ -3,22 +3,24 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-from bot.db import get_user
-from bot.config import BOT_USERNAME
+from bot.db import get_user, toggle_active, cursor, conn
+from bot.keyboards.profile_kb import profile_kb
 from bot.keyboards.gallery_kb import gallery_kb
+from bot.keyboards.edit_kb import edit_kb
+from bot.keyboards.register_kb import gender_kb, search_kb
+from bot.config import BOT_USERNAME
 
 router = Router()
 
 
 # ================= FSM =================
 
-class PhotoEdit(StatesGroup):
-    add = State()
-    delete = State()
-    set_main = State()
-
-
 class EditProfile(StatesGroup):
+    name = State()
+    age = State()
+    city = State()
+    gender = State()
+    search = State()
     about = State()
 
 
@@ -32,188 +34,212 @@ async def profile(message: Message, bot):
         await message.answer("Нет анкеты")
         return
 
-    (_, user_id, name, age, city, gender, search, about,
-     photo, username, referrer_id, invites, balance,
-     is_counted, likes, views, photos, is_active) = user
+    (_, _, name, age, city, gender, search, about,
+     photo, _, _, invites, balance,
+     _, likes, views, _, is_active) = user
 
-    rating = likes * 2 + views
+    text = f"""
+💖 {name}, {age}
+📍 {city}
 
-    text = (
-        f"💖 <b>{name}, {age}</b>\n"
-        f"📍 {city}\n\n"
-        f"🚻 {gender}\n"
-        f"❤️ {search}\n\n"
-        f"📝 {about}\n\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"⭐ Рейтинг: {rating}\n"
-        f"❤️ {likes} | 👁 {views}\n\n"
-        f"👥 {invites} | 💰 {balance}"
-    )
+🚻 {gender}
+❤️ {search}
+
+📝 {about}
+
+⭐ Рейтинг: {likes*2 + views}
+"""
 
     await bot.send_photo(
         message.chat.id,
-        photo=photo,
+        photo,
         caption=text,
-        parse_mode="HTML"
+        reply_markup=profile_kb(is_active)
     )
 
 
 # ================= ГАЛЕРЕЯ =================
 
-@router.message(F.text == "📸 Галерея")
-async def gallery(message: Message):
-    await message.answer("Управление фото 👇", reply_markup=gallery_kb())
+@router.callback_query(F.data == "gallery")
+async def gallery(call: CallbackQuery):
+    await call.message.answer("📸 Галерея", reply_markup=gallery_kb())
 
 
-# ➕ ДОБАВИТЬ
+# ================= РЕФЕРАЛКА =================
 
-@router.callback_query(F.data == "add_photo")
-async def add_photo(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("Отправь фото (макс 5)")
-    await state.set_state(PhotoEdit.add)
-
-
-@router.message(PhotoEdit.add, F.photo)
-async def save_photo(message: Message, state: FSMContext):
-    user = get_user(message.from_user.id)
-    photos = user[14] or []
-
-    if len(photos) >= 5:
-        await message.answer("Максимум 5 фото")
-        return
-
-    photo_id = message.photo[-1].file_id
-    photos.append(photo_id)
-
-    from bot.db import cursor, conn
-    cursor.execute(
-        "UPDATE users SET photos = %s WHERE user_id = %s",
-        (photos, message.from_user.id)
-    )
-    conn.commit()
-
-    await message.answer(f"✅ Добавлено ({len(photos)}/5)")
+@router.callback_query(F.data == "invite")
+async def invite(call: CallbackQuery):
+    link = f"https://t.me/{BOT_USERNAME}?start={call.from_user.id}"
+    await call.message.answer(f"🔗 Твоя ссылка:\n{link}")
 
 
-# 👀 СМОТРЕТЬ
+# ================= СКРЫТЬ =================
 
-@router.callback_query(F.data == "view_photos")
-async def view_photos(call: CallbackQuery, bot):
+@router.callback_query(F.data == "toggle_profile")
+async def toggle(call: CallbackQuery):
     user = get_user(call.from_user.id)
-    photos = user[14]
+    new_status = not user[17]
 
-    if not photos:
-        await call.answer("Нет фото", show_alert=True)
-        return
+    toggle_active(call.from_user.id, new_status)
 
-    for p in photos:
-        await bot.send_photo(call.message.chat.id, p)
-
-
-# ❌ УДАЛИТЬ
-
-@router.callback_query(F.data == "delete_photo")
-async def delete_photo(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("Номер фото для удаления (1-5)")
-    await state.set_state(PhotoEdit.delete)
-
-
-@router.message(PhotoEdit.delete)
-async def delete_process(message: Message, state: FSMContext):
-    index = int(message.text) - 1
-
-    user = get_user(message.from_user.id)
-    photos = user[14] or []
-
-    if index >= len(photos):
-        await message.answer("Нет такого фото")
-        return
-
-    photos.pop(index)
-
-    from bot.db import cursor, conn
-    cursor.execute(
-        "UPDATE users SET photos = %s WHERE user_id = %s",
-        (photos, message.from_user.id)
-    )
-    conn.commit()
-
-    await message.answer("Удалено")
-    await state.clear()
-
-
-# ⭐ ГЛАВНОЕ
-
-@router.callback_query(F.data == "set_main_photo")
-async def set_main(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("Номер фото сделать главным")
-    await state.set_state(PhotoEdit.set_main)
-
-
-@router.message(PhotoEdit.set_main)
-async def set_main_process(message: Message, state: FSMContext):
-    index = int(message.text) - 1
-
-    user = get_user(message.from_user.id)
-    photos = user[14] or []
-
-    if index >= len(photos):
-        await message.answer("Нет такого фото")
-        return
-
-    main_photo = photos[index]
-
-    from bot.db import cursor, conn
-    cursor.execute(
-        "UPDATE users SET photo = %s WHERE user_id = %s",
-        (main_photo, message.from_user.id)
-    )
-    conn.commit()
-
-    await message.answer("Главное фото обновлено")
-    await state.clear()
+    await call.message.answer("✅ Статус анкеты обновлён")
 
 
 # ================= РЕДАКТИРОВАНИЕ =================
 
-@router.message(F.text == "✏️ Редактировать анкету")
-async def edit_profile(message: Message, state: FSMContext):
-    await message.answer("Напиши новый текст о себе")
+@router.callback_query(F.data == "edit_profile")
+async def open_edit(call: CallbackQuery):
+    await call.message.answer("Что хочешь изменить?", reply_markup=edit_kb())
+
+
+# 👤 ИМЯ
+@router.callback_query(F.data == "edit_name")
+async def edit_name(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Новое имя:")
+    await state.set_state(EditProfile.name)
+
+
+@router.message(EditProfile.name)
+async def save_name(message: Message, state: FSMContext):
+    cursor.execute(
+        "UPDATE users SET name = %s WHERE user_id = %s",
+        (message.text, message.from_user.id)
+    )
+    conn.commit()
+
+    await message.answer("✅ Имя обновлено")
+    await state.clear()
+
+
+# 🎂 ВОЗРАСТ
+@router.callback_query(F.data == "edit_age")
+async def edit_age(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Новый возраст (16+):")
+    await state.set_state(EditProfile.age)
+
+
+@router.message(EditProfile.age)
+async def save_age(message: Message, state: FSMContext):
+    if not message.text.isdigit() or int(message.text) < 16:
+        await message.answer("Только 16+")
+        return
+
+    cursor.execute(
+        "UPDATE users SET age = %s WHERE user_id = %s",
+        (int(message.text), message.from_user.id)
+    )
+    conn.commit()
+
+    await message.answer("✅ Возраст обновлён")
+    await state.clear()
+
+
+# 📍 ГОРОД
+@router.callback_query(F.data == "edit_city")
+async def edit_city(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Новый город:")
+    await state.set_state(EditProfile.city)
+
+
+@router.message(EditProfile.city)
+async def save_city(message: Message, state: FSMContext):
+    cursor.execute(
+        "UPDATE users SET city = %s WHERE user_id = %s",
+        (message.text, message.from_user.id)
+    )
+    conn.commit()
+
+    await message.answer("✅ Город обновлён")
+    await state.clear()
+
+
+# 🚻 ПОЛ
+@router.callback_query(F.data == "edit_gender")
+async def edit_gender(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Выбери пол 👇", reply_markup=gender_kb)
+    await state.set_state(EditProfile.gender)
+
+
+@router.message(EditProfile.gender)
+async def save_gender(message: Message, state: FSMContext):
+    if message.text not in ["👨 Мужчина", "👩 Женщина", "👫 Пара", "⚧ Би"]:
+        await message.answer("Выбери кнопку")
+        return
+
+    cursor.execute(
+        "UPDATE users SET gender = %s WHERE user_id = %s",
+        (message.text, message.from_user.id)
+    )
+    conn.commit()
+
+    await message.answer("✅ Пол обновлён")
+    await state.clear()
+
+
+# ❤️ КОГО ИЩУ
+@router.callback_query(F.data == "edit_search")
+async def edit_search(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Кого ищешь 👇", reply_markup=search_kb)
+    await state.set_state(EditProfile.search)
+
+
+@router.message(EditProfile.search)
+async def save_search(message: Message, state: FSMContext):
+    if message.text not in ["👨 Мужчину", "👩 Девушку", "👫 Пару", "⚧ Би", "🌍 Всех"]:
+        await message.answer("Выбери кнопку")
+        return
+
+    cursor.execute(
+        "UPDATE users SET search = %s WHERE user_id = %s",
+        (message.text, message.from_user.id)
+    )
+    conn.commit()
+
+    await message.answer("✅ Обновлено")
+    await state.clear()
+
+
+# 📝 О СЕБЕ
+@router.callback_query(F.data == "edit_about")
+async def edit_about(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Новый текст:")
     await state.set_state(EditProfile.about)
 
 
 @router.message(EditProfile.about)
-async def update_about(message: Message, state: FSMContext):
-    from bot.db import cursor, conn
-
+async def save_about(message: Message, state: FSMContext):
     cursor.execute(
         "UPDATE users SET about = %s WHERE user_id = %s",
         (message.text, message.from_user.id)
     )
     conn.commit()
 
-    await message.answer("Анкета обновлена")
+    await message.answer("✅ Описание обновлено")
     await state.clear()
 
 
-# ================= СКРЫТЬ =================
+# ================= ЗАГЛУШКИ =================
 
-@router.message(F.text == "🚫 Скрыть анкету")
-async def toggle_profile(message: Message):
-    user = get_user(message.from_user.id)
-    is_active = user[15]
+@router.message(F.text == "🔥 Смотреть анкеты")
+async def search(message: Message):
+    await message.answer("🔥 Скоро будет")
 
-    from bot.db import cursor, conn
 
-    new_status = not is_active
+@router.message(F.text == "⭐ Премиум")
+async def premium(message: Message):
+    await message.answer("💎 Скоро будет")
 
-    cursor.execute(
-        "UPDATE users SET is_active = %s WHERE user_id = %s",
-        (new_status, message.from_user.id)
-    )
-    conn.commit()
 
-    if new_status:
-        await message.answer("Анкета включена")
-    else:
-        await message.answer("Анкета скрыта")
+@router.message(F.text == "🆘 Помощь")
+async def help(message: Message):
+    await message.answer("Напиши админу")
+
+
+@router.message(F.text == "ℹ️ О нас")
+async def about(message: Message):
+    await message.answer("Moldova Dating 🇲🇩")
+
+
+@router.message(F.text == "📄 Правила")
+async def rules(message: Message):
+    await message.answer("📄 Правила внутри кнопки")
