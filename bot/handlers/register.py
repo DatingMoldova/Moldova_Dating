@@ -1,16 +1,16 @@
 from aiogram import Router, F
 from aiogram.types import Message
-from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-from bot.db import save_user, add_referral, get_user
-from bot.config import LOG_CHANNEL
+from bot.db import save_user
+from bot.keyboards.register_kb import gender_kb, search_kb
 from bot.keyboards.main_menu import main_menu
 
 router = Router()
 
 
-class Register(StatesGroup):
+class Reg(StatesGroup):
     name = State()
     age = State()
     city = State()
@@ -20,98 +20,75 @@ class Register(StatesGroup):
     photo = State()
 
 
-async def start_register(message: Message, state: FSMContext):
+async def start_register(message: Message):
     await message.answer("Как тебя зовут?")
-    await state.set_state(Register.name)
+    await Reg.name.set()
 
 
-@router.message(Register.name)
+@router.message(Reg.name)
 async def name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await message.answer("Сколько тебе лет?")
-    await state.set_state(Register.age)
+    await state.set_state(Reg.age)
 
 
-@router.message(Register.age)
+@router.message(Reg.age)
 async def age(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("Введите число")
+    if not message.text.isdigit() or int(message.text) < 16:
+        await message.answer("Только 16+")
         return
 
-    await state.update_data(age=message.text)
-    await message.answer("Из какого ты города?")
-    await state.set_state(Register.city)
+    await state.update_data(age=int(message.text))
+    await message.answer("Твой город?")
+    await state.set_state(Reg.city)
 
 
-@router.message(Register.city)
+@router.message(Reg.city)
 async def city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
-    await message.answer("Твой пол?")
-    await state.set_state(Register.gender)
+    await message.answer("Выбери пол 👇", reply_markup=gender_kb)
+    await state.set_state(Reg.gender)
 
 
-@router.message(Register.gender)
+@router.message(Reg.gender)
 async def gender(message: Message, state: FSMContext):
     await state.update_data(gender=message.text)
-    await message.answer("Кого ищешь?")
-    await state.set_state(Register.search)
+    await message.answer("Кого ищешь 👇", reply_markup=search_kb)
+    await state.set_state(Reg.search)
 
 
-@router.message(Register.search)
+@router.message(Reg.search)
 async def search(message: Message, state: FSMContext):
     await state.update_data(search=message.text)
-    await message.answer("Расскажи о себе")
-    await state.set_state(Register.about)
+    await message.answer("Напиши о себе")
+    await state.set_state(Reg.about)
 
 
-@router.message(Register.about)
+@router.message(Reg.about)
 async def about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await message.answer("Отправь фото")
-    await state.set_state(Register.photo)
+    await state.set_state(Reg.photo)
 
 
-@router.message(Register.photo, F.photo)
-async def photo(message: Message, state: FSMContext, bot):
+@router.message(Reg.photo, F.photo)
+async def photo(message: Message, state: FSMContext):
     data = await state.get_data()
-    photo_id = message.photo[-1].file_id
 
-    referrer_id = data.get("referrer_id")
-
-    if referrer_id and not get_user(referrer_id):
-        referrer_id = None
+    photo = message.photo[-1].file_id
 
     save_user(
-        user_id=message.from_user.id,
-        name=data['name'],
-        age=int(data['age']),
-        city=data['city'],
-        gender=data['gender'],
-        search=data['search'],
-        about=data['about'],
-        photo=photo_id,
-        username=message.from_user.username,
-        referrer_id=referrer_id
+        message.from_user.id,
+        data["name"],
+        data["age"],
+        data["city"],
+        data["gender"],
+        data["search"],
+        data["about"],
+        photo,
+        message.from_user.username,
+        None
     )
 
-    if referrer_id:
-        add_referral(referrer_id, message.from_user.id)
-
-    text = (
-        f"💖 Moldova Dating\n\n"
-        f"👤 {data['name']}, {data['age']}\n"
-        f"📍 {data['city']}\n"
-        f"🚻 {data['gender']} | ❤️ Ищет: {data['search']}\n\n"
-        f"📝 {data['about']}\n\n"
-        f"ID: {message.from_user.id}"
-    )
-
-    await bot.send_photo(LOG_CHANNEL, photo=photo_id, caption=text)
-
-    await message.answer("✅ Анкета создана!", reply_markup=main_menu)
+    await message.answer("✅ Регистрация завершена", reply_markup=main_menu)
     await state.clear()
-
-
-@router.message(Register.photo)
-async def no_photo(message: Message):
-    await message.answer("Отправь фото 📸")
