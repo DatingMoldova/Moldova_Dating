@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
+# ⬅️ КНОПКА НАЗАД
 def back_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -9,6 +10,7 @@ def back_kb():
     )
 
 
+# 🚻 ВЫБОР ПОЛА
 def gender_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -21,6 +23,7 @@ def gender_kb():
     )
 
 
+# ❤️ КОГО ИЩЕШЬ
 def search_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -30,5 +33,17 @@ def search_kb():
             [InlineKeyboardButton(text="⚧ Би", callback_data="s_bi")],
             [InlineKeyboardButton(text="🌍 Всех", callback_data="s_all")],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="back")]
+        ]
+    )
+
+
+# ✅ ПОДТВЕРЖДЕНИЕ АНКЕТЫ
+def confirm_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_yes"),
+                InlineKeyboardButton(text="❌ Заново", callback_data="confirm_no")
+            ]
         ]
     )
