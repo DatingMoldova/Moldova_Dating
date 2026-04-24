@@ -10,7 +10,6 @@ conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 
-# 🔥 СОЗДАНИЕ ТАБЛИЦЫ
 def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -28,7 +27,7 @@ def init_db():
             photo TEXT,
             username TEXT,
 
-            referrer INT,
+            referrer BIGINT,
 
             invites INT DEFAULT 0,
             balance INT DEFAULT 0,
@@ -37,17 +36,15 @@ def init_db():
 
             likes INT DEFAULT 0,
             views INT DEFAULT 0,
+            reputation INT DEFAULT 0,
 
             is_premium BOOLEAN DEFAULT FALSE,
-            is_active BOOLEAN DEFAULT TRUE,
-
-            reputation INT DEFAULT 0
+            is_active BOOLEAN DEFAULT TRUE
         )
     """)
     conn.commit()
 
 
-# 💾 СОХРАНЕНИЕ
 def save_user(user_id, name, age, city, gender, search, about, photo, username, referrer):
     cursor.execute("""
         INSERT INTO users 
@@ -65,44 +62,31 @@ def save_user(user_id, name, age, city, gender, search, about, photo, username, 
 
     conn.commit()
 
+    # 🎁 рефералка
+    if referrer and referrer != user_id:
+        cursor.execute(
+            "UPDATE users SET balance = balance + 10, invites = invites + 1 WHERE user_id = %s",
+            (referrer,)
+        )
+        conn.commit()
 
-# 👤 ПОЛУЧИТЬ
+
 def get_user(user_id):
     cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     return cursor.fetchone()
 
 
-# ⭐ РЕПУТАЦИЯ
-def get_reputation(user_id):
-    cursor.execute("SELECT reputation FROM users WHERE user_id = %s", (user_id,))
-    result = cursor.fetchone()
-    return result[0] if result else 0
-
-
-def add_reputation(user_id, amount=1):
+def add_like(user_id):
     cursor.execute(
-        "UPDATE users SET reputation = reputation + %s WHERE user_id = %s",
-        (amount, user_id)
+        "UPDATE users SET likes = likes + 1, reputation = reputation + 1 WHERE user_id = %s",
+        (user_id,)
     )
     conn.commit()
 
 
-# 🔄 АКТИВНОСТЬ
-def toggle_active(user_id, status: bool):
+def add_view(user_id):
     cursor.execute(
-        "UPDATE users SET is_active = %s WHERE user_id = %s",
-        (status, user_id)
+        "UPDATE users SET views = views + 1 WHERE user_id = %s",
+        (user_id,)
     )
-    conn.commit()
-
-
-# 📊 СТАТА
-def get_users_count():
-    cursor.execute("SELECT COUNT(*) FROM users")
-    return cursor.fetchone()[0]
-
-
-# 💣 СБРОС
-def reset_db():
-    cursor.execute("DELETE FROM users")
     conn.commit()
