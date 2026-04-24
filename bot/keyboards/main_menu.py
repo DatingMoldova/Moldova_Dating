@@ -13,6 +13,9 @@ main_menu = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="📄 О нас"),
             KeyboardButton(text="📜 Соглашение")
+        ],
+        [ 
+            KeyboardButton(text="📩 Поддержка")
         ]
     ],
     resize_keyboard=True
