@@ -1,55 +1,64 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 
-from bot.db import (
-    get_user,
-    update_user_field,
-    delete_user,
-    add_photo,
-    get_photos,
-    delete_photo,
-    set_main_photo
-)
-
-from bot.keyboards.profile_kb import profile_kb, edit_kb, confirm_delete_kb
-from bot.keyboards.gallery_kb import gallery_main_kb, photo_actions_kb
+from bot.db import get_user, add_view, save_user
 
 router = Router()
 
 
-# =========================
-# STATES
-# =========================
-
-class Edit(StatesGroup):
+# 🔥 СТЕЙТЫ РЕДАКТОРА
+class EditProfile(StatesGroup):
     name = State()
     age = State()
     city = State()
     about = State()
+    photo = State()
 
 
-class GalleryState(StatesGroup):
-    add = State()
+# 🔘 КНОПКИ
+def profile_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✏️ Редактировать", callback_data="edit")],
+            [InlineKeyboardButton(text="🖼 Галерея", callback_data="gallery")],
+            [InlineKeyboardButton(text="👥 Пригласить друга", callback_data="invite")],
+            [InlineKeyboardButton(text="❌ Удалить анкету", callback_data="delete")]
+        ]
+    )
 
 
-# =========================
+def confirm_delete_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Да", callback_data="delete_yes"),
+                InlineKeyboardButton(text="❌ Нет", callback_data="delete_no")
+            ]
+        ]
+    )
+
+
 # 👤 ПРОФИЛЬ
-# =========================
-
 @router.message(F.text == "👤 Моя анкета")
-async def my_profile(message: Message):
+async def profile(message: Message):
     user = get_user(message.from_user.id)
 
     if not user:
-        await message.answer("❌ У вас нет анкеты. Напишите /start")
-        return
+        return await message.answer("❌ Сначала регистрация")
+
+    add_view(message.from_user.id)
 
     text = (
-        f"👤 {user[2]}, {user[3]}\n"
+        f"👤 <b>{user[2]}, {user[3]}</b>\n\n"
+        f"⭐ Репутация: {user[17]}\n"
+        f"❤️ Лайки: {user[14]}\n"
+        f"👀 Просмотры: {user[15]}\n\n"
+        f"💰 Баланс: {user[12]}\n"
+        f"👥 Приглашено: {user[11]}\n\n"
         f"📍 {user[4]}\n\n"
-        f"{user[5]} → {user[6]}\n\n"
+        f"{user[5]} ищет {user[6]}\n\n"
         f"📝 {user[7]}"
     )
 
@@ -60,208 +69,131 @@ async def my_profile(message: Message):
     )
 
 
-# =========================
-# 🗑 УДАЛЕНИЕ (С ПОДТВЕРЖДЕНИЕМ)
-# =========================
-
-@router.callback_query(F.data == "delete_profile")
-async def delete_profile_start(call: CallbackQuery):
-    await call.answer()
-
-    await call.message.answer(
-        "❗ Вы точно хотите удалить анкету?",
-        reply_markup=confirm_delete_kb()
-    )
-
-
-@router.callback_query(F.data == "confirm_delete")
-async def confirm_delete(call: CallbackQuery):
-    await call.answer()
-
-    delete_user(call.from_user.id)
-
-    await call.message.delete()
-    await call.message.answer("🗑 Анкета удалена. Напишите /start")
-
-
-@router.callback_query(F.data == "cancel_delete")
-async def cancel_delete(call: CallbackQuery):
-    await call.answer("Отмена")
-    await call.message.delete()
-
-
-# =========================
+# =======================
 # ✏️ РЕДАКТОР
-# =========================
+# =======================
 
-@router.callback_query(F.data == "edit_profile")
-async def open_editor(call: CallbackQuery):
-    await call.answer()
-    await call.message.answer("✏️ Что изменить?", reply_markup=edit_kb())
-
-
-# 👤 имя
-@router.callback_query(F.data == "edit_name")
-async def edit_name_start(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer("Введите новое имя:")
-    await state.set_state(Edit.name)
+@router.callback_query(lambda c: c.data == "edit")
+async def edit_menu(call: CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Имя", callback_data="edit_name")],
+        [InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
+        [InlineKeyboardButton(text="Город", callback_data="edit_city")],
+        [InlineKeyboardButton(text="О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="Фото", callback_data="edit_photo")]
+    ])
+    await call.message.answer("✏️ Что изменить?", reply_markup=kb)
 
 
-@router.message(Edit.name)
-async def edit_name_save(message: Message, state: FSMContext):
-    update_user_field(message.from_user.id, "name", message.text)
-    await message.answer("✅ Имя обновлено")
-    await state.clear()
+@router.callback_query(lambda c: c.data.startswith("edit_"))
+async def edit_fields(call: CallbackQuery, state: FSMContext):
+    field = call.data.split("_")[1]
+
+    await state.set_state(getattr(EditProfile, field))
+    await call.message.answer(f"Введите новое значение ({field})")
 
 
-# 🎂 возраст
-@router.callback_query(F.data == "edit_age")
-async def edit_age_start(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer("Введите возраст:")
-    await state.set_state(Edit.age)
+@router.message(EditProfile.name)
+async def edit_name(message: Message, state: FSMContext):
+    await update_field(message, state, "name", message.text)
 
 
-@router.message(Edit.age)
-async def edit_age_save(message: Message, state: FSMContext):
+@router.message(EditProfile.age)
+async def edit_age(message: Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("❌ Введите число")
-        return
+        return await message.answer("❌ Введите число")
+    await update_field(message, state, "age", int(message.text))
 
-    update_user_field(message.from_user.id, "age", int(message.text))
-    await message.answer("✅ Возраст обновлен")
+
+@router.message(EditProfile.city)
+async def edit_city(message: Message, state: FSMContext):
+    await update_field(message, state, "city", message.text)
+
+
+@router.message(EditProfile.about)
+async def edit_about(message: Message, state: FSMContext):
+    await update_field(message, state, "about", message.text)
+
+
+@router.message(EditProfile.photo, F.photo)
+async def edit_photo(message: Message, state: FSMContext):
+    await update_field(message, state, "photo", message.photo[-1].file_id)
+
+
+async def update_field(message, state, field, value):
+    user = get_user(message.from_user.id)
+
+    data = {
+        "name": user[2],
+        "age": user[3],
+        "city": user[4],
+        "gender": user[5],
+        "search": user[6],
+        "about": user[7],
+        "photo": user[8]
+    }
+
+    data[field] = value
+
+    save_user(
+        user_id=message.from_user.id,
+        name=data["name"],
+        age=data["age"],
+        city=data["city"],
+        gender=data["gender"],
+        search=data["search"],
+        about=data["about"],
+        photo=data["photo"],
+        username=message.from_user.username,
+        referrer=None
+    )
+
     await state.clear()
+    await message.answer("✅ Обновлено")
 
 
-# 📍 город
-@router.callback_query(F.data == "edit_city")
-async def edit_city_start(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer("Введите город:")
-    await state.set_state(Edit.city)
+# =======================
+# 🖼 ГАЛЕРЕЯ (простая)
+# =======================
+
+@router.callback_query(lambda c: c.data == "gallery")
+async def gallery(call: CallbackQuery):
+    await call.message.answer("🖼 Галерея пока 1 фото (будет расширена)")
 
 
-@router.message(Edit.city)
-async def edit_city_save(message: Message, state: FSMContext):
-    update_user_field(message.from_user.id, "city", message.text)
-    await message.answer("✅ Город обновлен")
-    await state.clear()
+# =======================
+# 👥 РЕФЕРАЛКА
+# =======================
 
-
-# 📝 о себе
-@router.callback_query(F.data == "edit_about")
-async def edit_about_start(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-    await call.message.answer("Напишите о себе:")
-    await state.set_state(Edit.about)
-
-
-@router.message(Edit.about)
-async def edit_about_save(message: Message, state: FSMContext):
-    update_user_field(message.from_user.id, "about", message.text)
-    await message.answer("✅ Описание обновлено")
-    await state.clear()
-
-
-# =========================
-# 🖼 ГАЛЕРЕЯ
-# =========================
-
-@router.callback_query(F.data == "gallery")
-async def open_gallery(call: CallbackQuery):
-    await call.answer()
-
-    photos = get_photos(call.from_user.id)
-    count = len(photos)
+@router.callback_query(lambda c: c.data == "invite")
+async def invite(call: CallbackQuery):
+    bot_username = (await call.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start={call.from_user.id}"
 
     await call.message.answer(
-        f"🖼 Галерея\n\nФото: {count}/5",
-        reply_markup=gallery_main_kb(count)
+        f"👥 Приглашай друзей и получай 💰\n\n🔗 {link}"
     )
 
 
-# ➕ добавить фото
-@router.callback_query(F.data == "add_photo")
-async def add_photo_start(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+# =======================
+# ❌ УДАЛЕНИЕ
+# =======================
 
-    photos = get_photos(call.from_user.id)
-
-    if len(photos) >= 5:
-        await call.message.answer("❌ Уже 5 фото")
-        return
-
-    await call.message.answer("📸 Отправьте фото")
-    await state.set_state(GalleryState.add)
+@router.callback_query(lambda c: c.data == "delete")
+async def delete_profile(call: CallbackQuery):
+    await call.message.answer("Точно удалить?", reply_markup=confirm_delete_kb())
 
 
-@router.message(GalleryState.add, F.photo)
-async def save_photo(message: Message, state: FSMContext):
-    file_id = message.photo[-1].file_id
+@router.callback_query(lambda c: c.data == "delete_yes")
+async def confirm_delete(call: CallbackQuery):
+    from bot.db import cursor, conn
 
-    ok = add_photo(message.from_user.id, file_id)
+    cursor.execute("DELETE FROM users WHERE user_id = %s", (call.from_user.id,))
+    conn.commit()
 
-    if not ok:
-        await message.answer("❌ Лимит 5 фото")
-    else:
-        await message.answer("✅ Фото добавлено")
-
-    await state.clear()
+    await call.message.answer("❌ Анкета удалена")
 
 
-# 📸 мои фото
-@router.callback_query(F.data == "my_photos")
-async def my_photos(call: CallbackQuery):
-    await call.answer()
-
-    photos = get_photos(call.from_user.id)
-
-    if not photos:
-        await call.message.answer("❌ Нет фото")
-        return
-
-    for i, (photo_id, file_id) in enumerate(photos, start=1):
-        await call.message.answer_photo(
-            photo=file_id,
-            caption=f"Фото {i}",
-            reply_markup=photo_actions_kb(photo_id)
-        )
-
-
-# ⭐ главное фото
-@router.callback_query(F.data.startswith("set_main_"))
-async def set_main(call: CallbackQuery):
-    await call.answer()
-
-    photo_id = int(call.data.split("_")[2])
-    photos = get_photos(call.from_user.id)
-
-    for pid, file_id in photos:
-        if pid == photo_id:
-            set_main_photo(call.from_user.id, file_id)
-            await call.message.answer("⭐ Главное фото обновлено")
-            return
-
-
-# ❌ удалить фото
-@router.callback_query(F.data.startswith("del_"))
-async def delete_photo_handler(call: CallbackQuery):
-    await call.answer()
-
-    photo_id = int(call.data.split("_")[1])
-
-    delete_photo(photo_id)
-
-    await call.message.delete()
-    await call.message.answer("❌ Фото удалено")
-
-
-# =========================
-# ⬅️ НАЗАД
-# =========================
-
-@router.callback_query(F.data == "back_profile")
-async def back_profile(call: CallbackQuery):
-    await call.answer()
-    await call.message.delete()
+@router.callback_query(lambda c: c.data == "delete_no")
+async def cancel_delete(call: CallbackQuery):
+    await call.message.answer("👌 Отмена")
