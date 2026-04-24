@@ -14,6 +14,7 @@ from bot.db import (
     set_premium,
     create_promo,
     add_moderator,
+    get_users_count,
     cursor,
     conn
 )
@@ -23,7 +24,6 @@ router = Router()
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 
-# 🔒 ПРОВЕРКА
 def is_admin(user_id):
     return user_id == ADMIN_ID
 
@@ -38,6 +38,8 @@ def admin_kb():
             [InlineKeyboardButton(text="⭐ Премиум", callback_data="admin_premium")],
             [InlineKeyboardButton(text="🎁 Промокод", callback_data="admin_promo")],
             [InlineKeyboardButton(text="🛡 Модератор", callback_data="admin_mod")],
+            [InlineKeyboardButton(text="🏆 Топ рефералов", callback_data="admin_top")],
+            [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
             [InlineKeyboardButton(text="💣 Сброс БД", callback_data="admin_reset")]
         ]
     )
@@ -52,10 +54,7 @@ async def admin_panel(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    await message.answer(
-        "🛠 <b>Админ панель</b>",
-        reply_markup=admin_kb()
-    )
+    await message.answer("🛠 <b>Админ панель</b>", reply_markup=admin_kb())
 
 
 # =========================
@@ -78,7 +77,6 @@ async def premium_user(message: Message, state: FSMContext):
 @router.message(F.text, state="premium_confirm")
 async def premium_confirm(message: Message, state: FSMContext):
     data = await state.get_data()
-
     status = message.text.lower() == "да"
 
     set_premium(data["user_id"], status)
@@ -130,6 +128,51 @@ async def mod_add(message: Message, state: FSMContext):
 
     await message.answer("🛡 Модератор назначен")
     await state.clear()
+
+
+# =========================
+# 🏆 ТОП РЕФЕРАЛОВ
+# =========================
+
+@router.callback_query(F.data == "admin_top")
+async def top_ref(call: CallbackQuery):
+    cursor.execute("""
+        SELECT name, invites FROM users
+        ORDER BY invites DESC
+        LIMIT 10
+    """)
+    users = cursor.fetchall()
+
+    text = "🏆 <b>Топ по рефералам</b>\n\n"
+
+    for i, u in enumerate(users, start=1):
+        text += f"{i}. {u[0]} — {u[1]} 👥\n"
+
+    await call.message.answer(text)
+
+
+# =========================
+# 📊 СТАТИСТИКА
+# =========================
+
+@router.callback_query(F.data == "admin_stats")
+async def stats(call: CallbackQuery):
+    total = get_users_count()
+
+    cursor.execute("SELECT SUM(balance) FROM users")
+    total_balance = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT SUM(invites) FROM users")
+    total_invites = cursor.fetchone()[0] or 0
+
+    text = (
+        f"📊 <b>Статистика</b>\n\n"
+        f"👥 Пользователей: {total}\n"
+        f"👥 Всего рефералов: {total_invites}\n"
+        f"💰 Баланс системы: {total_balance}"
+    )
+
+    await call.message.answer(text)
 
 
 # =========================
