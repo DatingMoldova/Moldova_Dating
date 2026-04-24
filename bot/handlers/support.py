@@ -1,6 +1,8 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+
 import os
 
 router = Router()
@@ -10,16 +12,25 @@ SUPPORT_TOPIC_ID = int(os.getenv("SUPPORT_TOPIC_ID"))
 
 
 # =========================
+# 🔥 СТЕЙТЫ
+# =========================
+
+class SupportState(StatesGroup):
+    waiting_text = State()
+    reply_text = State()
+
+
+# =========================
 # 🎫 СОЗДАНИЕ ТИКЕТА
 # =========================
 
 @router.message(F.text == "📩 Поддержка")
 async def support_start(message: Message, state: FSMContext):
-    await message.answer("✍️ Напишите ваше сообщение (жалоба / предложение):")
-    await state.set_state("support_text")
+    await message.answer("✍️ Напишите ваше сообщение:")
+    await state.set_state(SupportState.waiting_text)
 
 
-@router.message(F.text, state="support_text")
+@router.message(SupportState.waiting_text)
 async def send_ticket(message: Message, state: FSMContext):
     user = message.from_user
 
@@ -34,14 +45,8 @@ async def send_ticket(message: Message, state: FSMContext):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(
-                    text="💬 Ответить",
-                    callback_data=f"reply_{user.id}"
-                ),
-                InlineKeyboardButton(
-                    text="🔒 Закрыть",
-                    callback_data="close_ticket"
-                )
+                InlineKeyboardButton(text="💬 Ответить", callback_data=f"reply_{user.id}"),
+                InlineKeyboardButton(text="🔒 Закрыть", callback_data="close_ticket")
             ]
         ]
     )
@@ -58,7 +63,7 @@ async def send_ticket(message: Message, state: FSMContext):
 
 
 # =========================
-# 💬 ОТВЕТ ИЗ ГРУППЫ
+# 💬 ОТВЕТ
 # =========================
 
 @router.callback_query(F.data.startswith("reply_"))
@@ -66,11 +71,11 @@ async def reply_ticket(call: CallbackQuery, state: FSMContext):
     user_id = int(call.data.split("_")[1])
 
     await state.update_data(reply_user=user_id)
-    await call.message.answer("✍️ Введите ответ пользователю:")
-    await state.set_state("reply_text")
+    await call.message.answer("✍️ Введите ответ:")
+    await state.set_state(SupportState.reply_text)
 
 
-@router.message(F.text, state="reply_text")
+@router.message(SupportState.reply_text)
 async def send_reply(message: Message, state: FSMContext):
     data = await state.get_data()
     user_id = data.get("reply_user")
@@ -85,7 +90,7 @@ async def send_reply(message: Message, state: FSMContext):
 
 
 # =========================
-# 🔒 ЗАКРЫТЬ ТИКЕТ
+# 🔒 ЗАКРЫТЬ
 # =========================
 
 @router.callback_query(F.data == "close_ticket")
