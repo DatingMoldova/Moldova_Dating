@@ -6,18 +6,6 @@ def main_menu():
             [
                 KeyboardButton(text="👤 Моя анкета"),
                 KeyboardButton(text="🔍 Смотреть анкеты")
-            ],
-            [
-                KeyboardButton(text="⭐ Премиум"),
-                KeyboardButton(text="📩 Поддержка")
-            ],
-            [
-                KeyboardButton(text="❤️ Мои симпатии"),
-                KeyboardButton(text="ℹ️ Помощь")
-            ],
-            [
-                KeyboardButton(text="📄 О нас"),
-                KeyboardButton(text="📜 Соглашение")
             ]
         ],
         resize_keyboard=True
