@@ -10,7 +10,7 @@ conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 
-# 🔥 СОЗДАНИЕ ТАБЛИЦ
+# 🔥 СОЗДАНИЕ ТАБЛИЦЫ
 def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -28,7 +28,7 @@ def init_db():
             photo TEXT,
             username TEXT,
 
-            referrer BIGINT,
+            referrer INT,
 
             invites INT DEFAULT 0,
             balance INT DEFAULT 0,
@@ -39,23 +39,15 @@ def init_db():
             views INT DEFAULT 0,
 
             is_premium BOOLEAN DEFAULT FALSE,
-            is_active BOOLEAN DEFAULT TRUE
+            is_active BOOLEAN DEFAULT TRUE,
+
+            reputation INT DEFAULT 0
         )
     """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS photos (
-            id SERIAL PRIMARY KEY,
-            user_id BIGINT,
-            file_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
     conn.commit()
 
 
-# 💾 СОХРАНЕНИЕ / ОБНОВЛЕНИЕ
+# 💾 СОХРАНЕНИЕ
 def save_user(user_id, name, age, city, gender, search, about, photo, username, referrer):
     cursor.execute("""
         INSERT INTO users 
@@ -74,22 +66,28 @@ def save_user(user_id, name, age, city, gender, search, about, photo, username, 
     conn.commit()
 
 
-# 👤 ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ
+# 👤 ПОЛУЧИТЬ
 def get_user(user_id):
     cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     return cursor.fetchone()
 
 
-# ✏️ ОБНОВИТЬ ПОЛЕ
-def update_user_field(user_id, field, value):
+# ⭐ РЕПУТАЦИЯ
+def get_reputation(user_id):
+    cursor.execute("SELECT reputation FROM users WHERE user_id = %s", (user_id,))
+    result = cursor.fetchone()
+    return result[0] if result else 0
+
+
+def add_reputation(user_id, amount=1):
     cursor.execute(
-        f"UPDATE users SET {field} = %s WHERE user_id = %s",
-        (value, user_id)
+        "UPDATE users SET reputation = reputation + %s WHERE user_id = %s",
+        (amount, user_id)
     )
     conn.commit()
 
 
-# 🙈 ВКЛ / ВЫКЛ АНКЕТЫ
+# 🔄 АКТИВНОСТЬ
 def toggle_active(user_id, status: bool):
     cursor.execute(
         "UPDATE users SET is_active = %s WHERE user_id = %s",
@@ -98,71 +96,13 @@ def toggle_active(user_id, status: bool):
     conn.commit()
 
 
-# 🗑 УДАЛИТЬ ПОЛЬЗОВАТЕЛЯ
-def delete_user(user_id):
-    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-    cursor.execute("DELETE FROM photos WHERE user_id = %s", (user_id,))
-    conn.commit()
-
-
-# 📊 КОЛ-ВО ПОЛЬЗОВАТЕЛЕЙ
+# 📊 СТАТА
 def get_users_count():
     cursor.execute("SELECT COUNT(*) FROM users")
     return cursor.fetchone()[0]
 
 
-# 💣 СБРОС БД
+# 💣 СБРОС
 def reset_db():
     cursor.execute("DELETE FROM users")
-    cursor.execute("DELETE FROM photos")
-    conn.commit()
-
-
-# =========================
-# 🖼 ГАЛЕРЕЯ
-# =========================
-
-# ➕ ДОБАВИТЬ ФОТО (макс 5)
-def add_photo(user_id, file_id):
-    cursor.execute(
-        "SELECT COUNT(*) FROM photos WHERE user_id = %s",
-        (user_id,)
-    )
-    count = cursor.fetchone()[0]
-
-    if count >= 5:
-        return False
-
-    cursor.execute(
-        "INSERT INTO photos (user_id, file_id) VALUES (%s, %s)",
-        (user_id, file_id)
-    )
-    conn.commit()
-    return True
-
-
-# 📸 ПОЛУЧИТЬ ФОТО
-def get_photos(user_id):
-    cursor.execute(
-        "SELECT id, file_id FROM photos WHERE user_id = %s",
-        (user_id,)
-    )
-    return cursor.fetchall()
-
-
-# ❌ УДАЛИТЬ ФОТО
-def delete_photo(photo_id):
-    cursor.execute(
-        "DELETE FROM photos WHERE id = %s",
-        (photo_id,)
-    )
-    conn.commit()
-
-
-# ⭐ СДЕЛАТЬ ГЛАВНЫМ (🔥 ИСПРАВЛЕНО)
-def set_main_photo(user_id, file_id):
-    cursor.execute(
-        "UPDATE users SET photo = %s WHERE user_id = %s",
-        (file_id, user_id)
-    )
     conn.commit()
