@@ -209,3 +209,58 @@ async def reset_db(call: CallbackQuery):
 @router.callback_query(F.data == "reset_no")
 async def cancel_reset(call: CallbackQuery):
     await call.message.answer("👌 Отмена")
+
+# =========================
+# 📢 РАССЫЛКА
+# =========================
+
+@router.callback_query(F.data == "admin_broadcast")
+async def broadcast_start(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("📢 Введите текст для рассылки:")
+    await state.set_state("broadcast_text")
+
+
+@router.message(F.text, state="broadcast_text")
+async def broadcast_text(message: Message, state: FSMContext):
+    await state.update_data(text=message.text)
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Отправить", callback_data="broadcast_yes"),
+                InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_no")
+            ]
+        ]
+    )
+
+    await message.answer(
+        f"📨 Предпросмотр:\n\n{message.text}",
+        reply_markup=kb
+    )
+
+
+@router.callback_query(F.data == "broadcast_yes")
+async def broadcast_send(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    text = data.get("text")
+
+    cursor.execute("SELECT user_id FROM users")
+    users = cursor.fetchall()
+
+    success = 0
+
+    for u in users:
+        try:
+            await call.bot.send_message(u[0], text)
+            success += 1
+        except:
+            pass
+
+    await call.message.answer(f"✅ Отправлено: {success}")
+    await state.clear()
+
+
+@router.callback_query(F.data == "broadcast_no")
+async def broadcast_cancel(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer("❌ Рассылка отменена")
