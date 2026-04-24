@@ -3,10 +3,10 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 from bot.db import save_user, get_user
 from bot.utils.logger import log_profile
-
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 router = Router()
 
@@ -23,45 +23,53 @@ class Register(StatesGroup):
     confirm = State()
 
 
-# 🔘 КНОПКИ
+# 🔘 ПОЛ
 def gender_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="👨 Парень", callback_data="male"),
-                InlineKeyboardButton(text="👩 Девушка", callback_data="female")
+                InlineKeyboardButton(text="👨 Мужчина", callback_data="male"),
+                InlineKeyboardButton(text="👩 Женщина", callback_data="female")
+            ],
+            [
+                InlineKeyboardButton(text="👥 Пара", callback_data="pair"),
+                InlineKeyboardButton(text="🔄 Би", callback_data="bi")
             ]
         ]
     )
 
 
+# 🔘 КОГО ИЩЕТ
 def search_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="👨 Парней", callback_data="search_male"),
-                InlineKeyboardButton(text="👩 Девушек", callback_data="search_female")
+                InlineKeyboardButton(text="👨 Мужчин", callback_data="search_male"),
+                InlineKeyboardButton(text="👩 Женщин", callback_data="search_female")
+            ],
+            [
+                InlineKeyboardButton(text="👥 Пару", callback_data="search_pair"),
+                InlineKeyboardButton(text="🔄 Би", callback_data="search_bi")
             ]
         ]
     )
 
 
+# 🔘 ПОДТВЕРЖДЕНИЕ
 def confirm_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="✅ Да", callback_data="confirm_yes"),
-                InlineKeyboardButton(text="❌ Нет", callback_data="confirm_no")
+                InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_yes"),
+                InlineKeyboardButton(text="❌ Заново", callback_data="confirm_no")
             ]
         ]
     )
 
 
 # 🚀 СТАРТ РЕГИСТРАЦИИ
-@router.message(F.text == "🚀 Регистрация")
 async def start_register(message: Message, state: FSMContext):
     await state.clear()
-
     await message.answer("👤 Введите ваше имя:")
     await state.set_state(Register.name)
 
@@ -89,26 +97,36 @@ async def get_age(message: Message, state: FSMContext):
 @router.message(Register.city)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
-    await message.answer("👤 Ваш пол:", reply_markup=gender_kb())
+    await message.answer("👤 Укажите ваш пол:", reply_markup=gender_kb())
     await state.set_state(Register.gender)
 
 
 # 👤 ПОЛ
 @router.callback_query(Register.gender)
 async def get_gender(call: CallbackQuery, state: FSMContext):
-    gender = "Парень" if call.data == "male" else "Девушка"
+    mapping = {
+        "male": "Мужчина",
+        "female": "Женщина",
+        "pair": "Пара",
+        "bi": "Би"
+    }
 
-    await state.update_data(gender=gender)
+    await state.update_data(gender=mapping.get(call.data))
     await call.message.edit_text("❤️ Кого ищете?", reply_markup=search_kb())
     await state.set_state(Register.search)
 
 
-# ❤️ КОГО ИЩЕМ
+# ❤️ КОГО ИЩЕТ
 @router.callback_query(Register.search)
 async def get_search(call: CallbackQuery, state: FSMContext):
-    search = "Парней" if call.data == "search_male" else "Девушек"
+    mapping = {
+        "search_male": "Мужчин",
+        "search_female": "Женщин",
+        "search_pair": "Пару",
+        "search_bi": "Би"
+    }
 
-    await state.update_data(search=search)
+    await state.update_data(search=mapping.get(call.data))
     await call.message.edit_text("📝 Расскажите о себе:")
     await state.set_state(Register.about)
 
@@ -131,7 +149,6 @@ async def get_photo(message: Message, state: FSMContext):
 
     text = (
         "📋 <b>Проверьте анкету</b>\n\n"
-
         f"👤 {data['name']}, {data['age']}\n"
         f"📍 {data['city']}\n\n"
         f"{data['gender']} ищет {data['search']}\n\n"
@@ -147,7 +164,7 @@ async def get_photo(message: Message, state: FSMContext):
     await state.set_state(Register.confirm)
 
 
-# ❌ ЕСЛИ НЕ ФОТО
+# ❌ НЕ ФОТО
 @router.message(Register.photo)
 async def no_photo(message: Message):
     await message.answer("❌ Отправьте фото")
@@ -156,6 +173,7 @@ async def no_photo(message: Message):
 # ✅ ПОДТВЕРЖДЕНИЕ
 @router.callback_query(Register.confirm)
 async def confirm(call: CallbackQuery, state: FSMContext):
+
     if call.data == "confirm_no":
         await state.clear()
         return await call.message.edit_text("❌ Регистрация отменена")
