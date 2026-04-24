@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.db import save_user, get_user
+from bot.db import create_user, get_user
 from bot.utils.logger import log_profile
 
 router = Router()
