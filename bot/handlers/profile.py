@@ -21,7 +21,7 @@ class EditProfile(StatesGroup):
 
 
 # =========================
-# 🔘 КНОПКИ ПРОФИЛЯ
+# 🔘 КНОПКИ
 # =========================
 
 def profile_kb():
@@ -50,21 +50,16 @@ def confirm_delete_kb():
 # 👤 ПРОФИЛЬ
 # =========================
 
-from aiogram.fsm.context import FSMContext
-
 @router.message(F.text == "👤 Моя анкета")
 async def profile(message: Message, state: FSMContext):
     await state.clear()
+
     user = get_user(message.from_user.id)
 
     if not user:
         return await message.answer("❌ Сначала пройдите регистрацию")
 
     add_view(message.from_user.id)
-
-    # =========================
-    # 🔥 ЧИСТЫЕ ЧИСЛА
-    # =========================
 
     balance = user[8] or 0
     premium = 1 if user[9] else 0
@@ -102,7 +97,9 @@ async def profile(message: Message, state: FSMContext):
 # =========================
 
 @router.callback_query(lambda c: c.data == "edit")
-async def edit_menu(call: CallbackQuery):
+async def edit_menu(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Имя", callback_data="edit_name")],
         [InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
@@ -149,7 +146,7 @@ async def edit_photo(message: Message, state: FSMContext):
 
 
 # =========================
-# 🔥 ОБНОВЛЕНИЕ ДАННЫХ
+# 🔥 ОБНОВЛЕНИЕ
 # =========================
 
 async def update_field(message, state, field, value):
@@ -187,7 +184,8 @@ async def update_field(message, state, field, value):
 # =========================
 
 @router.callback_query(lambda c: c.data == "gallery")
-async def gallery(call: CallbackQuery):
+async def gallery(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     await call.message.answer("🖼 Галерея скоро будет добавлена")
 
 
@@ -196,7 +194,9 @@ async def gallery(call: CallbackQuery):
 # =========================
 
 @router.callback_query(lambda c: c.data == "invite")
-async def invite(call: CallbackQuery):
+async def invite(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+
     bot_username = (await call.bot.get_me()).username
     link = f"https://t.me/{bot_username}?start={call.from_user.id}"
 
@@ -213,7 +213,8 @@ async def invite(call: CallbackQuery):
 # =========================
 
 @router.callback_query(lambda c: c.data == "delete")
-async def delete_profile(call: CallbackQuery):
+async def delete_profile(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     await call.message.answer("Точно удалить анкету?", reply_markup=confirm_delete_kb())
 
 
