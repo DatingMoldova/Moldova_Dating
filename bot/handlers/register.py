@@ -1,18 +1,12 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.db import create_user, get_user
-from bot.utils.logger import log_profile
 
 router = Router()
 
-
-# =========================
-# 🔥 FSM
-# =========================
 
 class Register(StatesGroup):
     name = State()
@@ -25,75 +19,53 @@ class Register(StatesGroup):
     confirm = State()
 
 
-# =========================
-# 🔘 КНОПКИ
-# =========================
-
 def gender_kb():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="👨 Мужчина", callback_data="male"),
-                InlineKeyboardButton(text="👩 Женщина", callback_data="female")
-            ],
-            [
-                InlineKeyboardButton(text="👥 Пара", callback_data="pair"),
-                InlineKeyboardButton(text="🔄 Би", callback_data="bi")
-            ]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👨 Мужчина", callback_data="male"),
+            InlineKeyboardButton(text="👩 Женщина", callback_data="female")
+        ],
+        [
+            InlineKeyboardButton(text="👥 Пара", callback_data="pair"),
+            InlineKeyboardButton(text="🔄 Би", callback_data="bi")
         ]
-    )
+    ])
 
 
 def search_kb():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="👨 Мужчин", callback_data="search_male"),
-                InlineKeyboardButton(text="👩 Женщин", callback_data="search_female")
-            ],
-            [
-                InlineKeyboardButton(text="👥 Пару", callback_data="search_pair"),
-                InlineKeyboardButton(text="🔄 Би", callback_data="search_bi")
-            ]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👨 Мужчин", callback_data="search_male"),
+            InlineKeyboardButton(text="👩 Женщин", callback_data="search_female")
+        ],
+        [
+            InlineKeyboardButton(text="👥 Пару", callback_data="search_pair"),
+            InlineKeyboardButton(text="🔄 Би", callback_data="search_bi")
         ]
-    )
+    ])
 
 
 def confirm_kb():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_yes"),
-                InlineKeyboardButton(text="❌ Заново", callback_data="confirm_no")
-            ]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_yes"),
+            InlineKeyboardButton(text="❌ Заново", callback_data="confirm_no")
         ]
-    )
+    ])
 
-
-# =========================
-# 🚀 СТАРТ
-# =========================
 
 async def start_register(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("👤 Введите ваше имя:")
+    await message.answer("👤 Введите имя:")
     await state.set_state(Register.name)
 
-
-# =========================
-# 👤 ИМЯ
-# =========================
 
 @router.message(Register.name)
 async def get_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await message.answer("🎂 Введите возраст:")
+    await message.answer("🎂 Возраст:")
     await state.set_state(Register.age)
 
-
-# =========================
-# 🎂 ВОЗРАСТ
-# =========================
 
 @router.message(Register.age)
 async def get_age(message: Message, state: FSMContext):
@@ -101,24 +73,16 @@ async def get_age(message: Message, state: FSMContext):
         return await message.answer("❌ Введите число")
 
     await state.update_data(age=int(message.text))
-    await message.answer("📍 Ваш город:")
+    await message.answer("📍 Город:")
     await state.set_state(Register.city)
 
-
-# =========================
-# 📍 ГОРОД
-# =========================
 
 @router.message(Register.city)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
-    await message.answer("👤 Укажите ваш пол:", reply_markup=gender_kb())
+    await message.answer("👤 Пол:", reply_markup=gender_kb())
     await state.set_state(Register.gender)
 
-
-# =========================
-# 👤 ПОЛ
-# =========================
 
 @router.callback_query(Register.gender)
 async def get_gender(call: CallbackQuery, state: FSMContext):
@@ -134,10 +98,6 @@ async def get_gender(call: CallbackQuery, state: FSMContext):
     await state.set_state(Register.search)
 
 
-# =========================
-# ❤️ КОГО ИЩЕТ
-# =========================
-
 @router.callback_query(Register.search)
 async def get_search(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -148,34 +108,24 @@ async def get_search(call: CallbackQuery, state: FSMContext):
     }
 
     await state.update_data(search=mapping.get(call.data))
-    await call.message.edit_text("📝 Расскажите о себе:")
+    await call.message.edit_text("📝 О себе:")
     await state.set_state(Register.about)
 
-
-# =========================
-# 📝 О СЕБЕ
-# =========================
 
 @router.message(Register.about)
 async def get_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
-    await message.answer("📸 Отправьте фото:")
+    await message.answer("📸 Фото:")
     await state.set_state(Register.photo)
 
 
-# =========================
-# 📸 ФОТО
-# =========================
-
 @router.message(Register.photo, F.photo)
 async def get_photo(message: Message, state: FSMContext):
-    photo_id = message.photo[-1].file_id
-    await state.update_data(photo=photo_id)
+    await state.update_data(photo=message.photo[-1].file_id)
 
     data = await state.get_data()
 
     text = (
-        "📋 <b>Проверьте анкету</b>\n\n"
         f"👤 {data['name']}, {data['age']}\n"
         f"📍 {data['city']}\n\n"
         f"{data['gender']} ищет {data['search']}\n\n"
@@ -183,7 +133,7 @@ async def get_photo(message: Message, state: FSMContext):
     )
 
     await message.answer_photo(
-        photo=photo_id,
+        photo=data["photo"],
         caption=text,
         reply_markup=confirm_kb()
     )
@@ -191,27 +141,15 @@ async def get_photo(message: Message, state: FSMContext):
     await state.set_state(Register.confirm)
 
 
-@router.message(Register.photo)
-async def no_photo(message: Message):
-    await message.answer("❌ Отправьте фото")
-
-
-# =========================
-# ✅ ПОДТВЕРЖДЕНИЕ
-# =========================
-
-@router.callback_query(Register.confirm, F.data.in_(["confirm_yes", "confirm_no"]))
+@router.callback_query(Register.confirm)
 async def confirm(call: CallbackQuery, state: FSMContext):
 
-    # ❌ отмена
     if call.data == "confirm_no":
         await state.clear()
-        return await call.message.edit_text("❌ Регистрация отменена")
+        return await call.message.edit_text("❌ Отменено")
 
-    # ✅ данные
     data = await state.get_data()
 
-    # ✅ сохранение (ВАЖНО — create_user)
     create_user(
         user_id=call.from_user.id,
         name=data["name"],
@@ -223,32 +161,15 @@ async def confirm(call: CallbackQuery, state: FSMContext):
         photo=data["photo"]
     )
 
-    # 🔥 лог
-    user = get_user(call.from_user.id)
-    await log_profile(call.bot, user)
-
-    # 🧹 удалить превью
     await call.message.delete()
-
-    # 👤 готовый профиль
-    text = (
-        f"👤 <b>{data['name']}, {data['age']}</b>\n"
-        f"📍 {data['city']}\n\n"
-        f"{data['gender']} ищет {data['search']}\n\n"
-        f"📝 {data['about']}"
-    )
 
     await call.message.answer_photo(
         photo=data["photo"],
-        caption=text
+        caption="✅ Анкета сохранена!"
     )
 
     from bot.keyboards.main_menu import main_menu
 
-    await call.message.answer(
-        "🎉 Регистрация завершена!",
-        reply_markup=main_menu
-    )
+    await call.message.answer("🎉 Готово", reply_markup=main_menu)
 
-    # ❗ САМОЕ ВАЖНОЕ
     await state.clear()
