@@ -21,7 +21,7 @@ from bot.db import (
 
 router = Router()
 
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 
 def is_admin(user_id):
@@ -53,7 +53,7 @@ def admin_kb():
 @router.message(Command("admin"))
 async def admin_panel(message: Message):
     if not is_admin(message.from_user.id):
-        return await message.answer("❌ Нет доступа")
+        return
 
     await message.answer("🛠 <b>Админ панель</b>", reply_markup=admin_kb())
 
@@ -64,35 +64,8 @@ async def admin_panel(message: Message):
 
 @router.callback_query(F.data == "admin_premium")
 async def premium_start(call: CallbackQuery, state: FSMContext):
-    if not is_admin(call.from_user.id):
-        return
-
     await state.set_state("premium_user")
     await call.message.answer("Введите ID пользователя:")
-
-
-@router.message(F.text)
-async def premium_user(message: Message, state: FSMContext):
-    if await state.get_state() != "premium_user":
-        return
-
-    await state.update_data(user_id=int(message.text))
-    await state.set_state("premium_confirm")
-    await message.answer("Включить премиум? (да/нет)")
-
-
-@router.message(F.text)
-async def premium_confirm(message: Message, state: FSMContext):
-    if await state.get_state() != "premium_confirm":
-        return
-
-    data = await state.get_data()
-    status = message.text.lower() == "да"
-
-    set_premium(data["user_id"], status)
-
-    await message.answer("✅ Премиум обновлён")
-    await state.clear()
 
 
 # =========================
@@ -101,33 +74,8 @@ async def premium_confirm(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "admin_promo")
 async def promo_start(call: CallbackQuery, state: FSMContext):
-    if not is_admin(call.from_user.id):
-        return
-
     await state.set_state("promo_code")
     await call.message.answer("Введите код промо:")
-
-
-@router.message(F.text)
-async def promo_code(message: Message, state: FSMContext):
-    if await state.get_state() != "promo_code":
-        return
-
-    await state.update_data(code=message.text)
-    await state.set_state("promo_reward")
-    await message.answer("Введите награду:")
-
-
-@router.message(F.text)
-async def promo_reward(message: Message, state: FSMContext):
-    if await state.get_state() != "promo_reward":
-        return
-
-    data = await state.get_data()
-    create_promo(data["code"], int(message.text))
-
-    await message.answer("🎁 Промокод создан")
-    await state.clear()
 
 
 # =========================
@@ -136,22 +84,8 @@ async def promo_reward(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "admin_mod")
 async def mod_start(call: CallbackQuery, state: FSMContext):
-    if not is_admin(call.from_user.id):
-        return
-
     await state.set_state("mod_user")
     await call.message.answer("Введите ID пользователя:")
-
-
-@router.message(F.text)
-async def mod_add(message: Message, state: FSMContext):
-    if await state.get_state() != "mod_user":
-        return
-
-    add_moderator(int(message.text))
-
-    await message.answer("🛡 Модератор назначен")
-    await state.clear()
 
 
 # =========================
@@ -160,9 +94,6 @@ async def mod_add(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "admin_top")
 async def top_ref(call: CallbackQuery):
-    if not is_admin(call.from_user.id):
-        return
-
     cursor.execute("""
         SELECT name, invites FROM users
         ORDER BY invites DESC
@@ -184,9 +115,6 @@ async def top_ref(call: CallbackQuery):
 
 @router.callback_query(F.data == "admin_stats")
 async def stats(call: CallbackQuery):
-    if not is_admin(call.from_user.id):
-        return
-
     total = get_users_count()
 
     cursor.execute("SELECT SUM(balance) FROM users")
@@ -222,9 +150,6 @@ def confirm_reset_kb():
 
 @router.callback_query(F.data == "admin_reset")
 async def reset_confirm(call: CallbackQuery):
-    if not is_admin(call.from_user.id):
-        return
-
     await call.message.answer(
         "⚠️ Удалить ВСЮ базу?",
         reply_markup=confirm_reset_kb()
@@ -233,9 +158,6 @@ async def reset_confirm(call: CallbackQuery):
 
 @router.callback_query(F.data == "reset_yes")
 async def reset_db(call: CallbackQuery):
-    if not is_admin(call.from_user.id):
-        return
-
     cursor.execute("TRUNCATE users, promos, moderators RESTART IDENTITY CASCADE")
     conn.commit()
 
@@ -253,40 +175,12 @@ async def cancel_reset(call: CallbackQuery):
 
 @router.callback_query(F.data == "admin_broadcast")
 async def broadcast_start(call: CallbackQuery, state: FSMContext):
-    if not is_admin(call.from_user.id):
-        return
-
     await state.set_state("broadcast_text")
     await call.message.answer("📢 Введите текст для рассылки:")
 
 
-@router.message(F.text)
-async def broadcast_text(message: Message, state: FSMContext):
-    if await state.get_state() != "broadcast_text":
-        return
-
-    await state.update_data(text=message.text)
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Отправить", callback_data="broadcast_yes"),
-                InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_no")
-            ]
-        ]
-    )
-
-    await message.answer(
-        f"📨 Предпросмотр:\n\n{message.text}",
-        reply_markup=kb
-    )
-
-
 @router.callback_query(F.data == "broadcast_yes")
 async def broadcast_send(call: CallbackQuery, state: FSMContext):
-    if not is_admin(call.from_user.id):
-        return
-
     data = await state.get_data()
     text = data.get("text")
 
@@ -310,3 +204,66 @@ async def broadcast_send(call: CallbackQuery, state: FSMContext):
 async def broadcast_cancel(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.answer("❌ Рассылка отменена")
+
+
+# =========================
+# 🔥 ЕДИНЫЙ FSM ОБРАБОТЧИК
+# =========================
+
+@router.message(F.text)
+async def admin_fsm(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+
+    if not current_state:
+        return
+
+    # ===== ПРЕМИУМ =====
+    if current_state == "premium_user":
+        await state.update_data(user_id=int(message.text))
+        await state.set_state("premium_confirm")
+        return await message.answer("Включить премиум? (да/нет)")
+
+    if current_state == "premium_confirm":
+        data = await state.get_data()
+        status = message.text.lower() == "да"
+
+        set_premium(data["user_id"], status)
+        await message.answer("✅ Премиум обновлён")
+        return await state.clear()
+
+    # ===== ПРОМО =====
+    if current_state == "promo_code":
+        await state.update_data(code=message.text)
+        await state.set_state("promo_reward")
+        return await message.answer("Введите награду:")
+
+    if current_state == "promo_reward":
+        data = await state.get_data()
+        create_promo(data["code"], int(message.text))
+
+        await message.answer("🎁 Промокод создан")
+        return await state.clear()
+
+    # ===== МОДЕРАТОР =====
+    if current_state == "mod_user":
+        add_moderator(int(message.text))
+        await message.answer("🛡 Модератор назначен")
+        return await state.clear()
+
+    # ===== РАССЫЛКА =====
+    if current_state == "broadcast_text":
+        await state.update_data(text=message.text)
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ Отправить", callback_data="broadcast_yes"),
+                    InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_no")
+                ]
+            ]
+        )
+
+        return await message.answer(
+            f"📨 Предпросмотр:\n\n{message.text}",
+            reply_markup=kb
+)
