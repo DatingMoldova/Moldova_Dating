@@ -12,7 +12,7 @@ def main_menu():
                 KeyboardButton(text="📩 Поддержка")
             ],
             [
-                KeyboardButton(text="🔗 Пригласить друга"),
+                KeyboardButton(text="❤️ Мои симпатии"),
                 KeyboardButton(text="ℹ️ Помощь")
             ],
             [
