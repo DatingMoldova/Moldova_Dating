@@ -8,16 +8,22 @@ from bot.db import get_user, add_view, create_user
 router = Router()
 
 
-# 🔥 СТЕЙТЫ РЕДАКТОРА
+# =========================
+# 🔥 FSM
+# =========================
+
 class EditProfile(StatesGroup):
     name = State()
     age = State()
     city = State()
-    about = State()
+    bio = State()
     photo = State()
 
 
-# 🔘 КНОПКИ
+# =========================
+# 🔘 КНОПКИ ПРОФИЛЯ
+# =========================
+
 def profile_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -40,38 +46,57 @@ def confirm_delete_kb():
     )
 
 
+# =========================
 # 👤 ПРОФИЛЬ
+# =========================
+
 @router.message(F.text == "👤 Моя анкета")
 async def profile(message: Message):
     user = get_user(message.from_user.id)
 
     if not user:
-        return await message.answer("❌ Сначала регистрация")
+        return await message.answer("❌ Сначала пройдите регистрацию")
 
     add_view(message.from_user.id)
 
+    # =========================
+    # 🔥 ЧИСТЫЕ ЧИСЛА
+    # =========================
+
+    balance = user[8] or 0
+    premium = 1 if user[9] else 0
+    invites = user[10] or 0
+    views = user[13] or 0
+    likes = user[14] or 0
+    rep = user[15] or 0
+
     text = (
-        f"👤 <b>{user[2]}, {user[3]}</b>\n\n"
-        f"⭐ Репутация: {user[17]}\n"
-        f"❤️ Лайки: {user[14]}\n"
-        f"👀 Просмотры: {user[15]}\n\n"
-        f"💰 Баланс: {user[12]}\n"
-        f"👥 Приглашено: {user[11]}\n\n"
-        f"📍 {user[4]}\n\n"
-        f"{user[5]} ищет {user[6]}\n\n"
-        f"📝 {user[7]}"
+        f"👤 <b>{user[1]}, {user[2]}</b>\n\n"
+
+        f"⭐ Репутация: {rep}\n"
+        f"❤️ Лайки: {likes}\n"
+        f"👀 Просмотры: {views}\n\n"
+
+        f"💰 Баланс: {balance}\n"
+        f"👥 Приглашено: {invites}\n"
+        f"💎 Премиум: {premium}\n\n"
+
+        f"📍 {user[3]}\n\n"
+        f"{user[4]} ищет {user[5]}\n\n"
+
+        f"📝 {user[6]}"
     )
 
     await message.answer_photo(
-        photo=user[8],
+        photo=user[7],
         caption=text,
         reply_markup=profile_kb()
     )
 
 
-# =======================
+# =========================
 # ✏️ РЕДАКТОР
-# =======================
+# =========================
 
 @router.callback_query(lambda c: c.data == "edit")
 async def edit_menu(call: CallbackQuery):
@@ -79,7 +104,7 @@ async def edit_menu(call: CallbackQuery):
         [InlineKeyboardButton(text="Имя", callback_data="edit_name")],
         [InlineKeyboardButton(text="Возраст", callback_data="edit_age")],
         [InlineKeyboardButton(text="Город", callback_data="edit_city")],
-        [InlineKeyboardButton(text="О себе", callback_data="edit_about")],
+        [InlineKeyboardButton(text="О себе", callback_data="edit_bio")],
         [InlineKeyboardButton(text="Фото", callback_data="edit_photo")]
     ])
     await call.message.answer("✏️ Что изменить?", reply_markup=kb)
@@ -90,7 +115,7 @@ async def edit_fields(call: CallbackQuery, state: FSMContext):
     field = call.data.split("_")[1]
 
     await state.set_state(getattr(EditProfile, field))
-    await call.message.answer(f"Введите новое значение ({field})")
+    await call.message.answer("✏️ Введите новое значение")
 
 
 @router.message(EditProfile.name)
@@ -110,9 +135,9 @@ async def edit_city(message: Message, state: FSMContext):
     await update_field(message, state, "city", message.text)
 
 
-@router.message(EditProfile.about)
-async def edit_about(message: Message, state: FSMContext):
-    await update_field(message, state, "about", message.text)
+@router.message(EditProfile.bio)
+async def edit_bio(message: Message, state: FSMContext):
+    await update_field(message, state, "bio", message.text)
 
 
 @router.message(EditProfile.photo, F.photo)
@@ -120,50 +145,52 @@ async def edit_photo(message: Message, state: FSMContext):
     await update_field(message, state, "photo", message.photo[-1].file_id)
 
 
+# =========================
+# 🔥 ОБНОВЛЕНИЕ ДАННЫХ
+# =========================
+
 async def update_field(message, state, field, value):
     user = get_user(message.from_user.id)
 
     data = {
-        "name": user[2],
-        "age": user[3],
-        "city": user[4],
-        "gender": user[5],
-        "search": user[6],
-        "about": user[7],
-        "photo": user[8]
+        "name": user[1],
+        "age": user[2],
+        "city": user[3],
+        "gender": user[4],
+        "looking": user[5],
+        "bio": user[6],
+        "photo": user[7]
     }
 
     data[field] = value
 
-    save_user(
+    create_user(
         user_id=message.from_user.id,
         name=data["name"],
         age=data["age"],
         city=data["city"],
         gender=data["gender"],
-        search=data["search"],
-        about=data["about"],
-        photo=data["photo"],
-        username=message.from_user.username,
-        referrer=None
+        looking=data["looking"],
+        bio=data["bio"],
+        photo=data["photo"]
     )
 
     await state.clear()
     await message.answer("✅ Обновлено")
 
 
-# =======================
-# 🖼 ГАЛЕРЕЯ (простая)
-# =======================
+# =========================
+# 🖼 ГАЛЕРЕЯ
+# =========================
 
 @router.callback_query(lambda c: c.data == "gallery")
 async def gallery(call: CallbackQuery):
-    await call.message.answer("🖼 Галерея пока 1 фото (будет расширена)")
+    await call.message.answer("🖼 Галерея скоро будет добавлена")
 
 
-# =======================
+# =========================
 # 👥 РЕФЕРАЛКА
-# =======================
+# =========================
 
 @router.callback_query(lambda c: c.data == "invite")
 async def invite(call: CallbackQuery):
@@ -171,17 +198,20 @@ async def invite(call: CallbackQuery):
     link = f"https://t.me/{bot_username}?start={call.from_user.id}"
 
     await call.message.answer(
-        f"👥 Приглашай друзей и получай 💰\n\n🔗 {link}"
+        f"👥 <b>Приглашай друзей</b>\n\n"
+        f"🔗 <code>{link}</code>\n\n"
+        f"💰 За каждого друга бонус\n"
+        f"🔥 Повышай рейтинг активности"
     )
 
 
-# =======================
+# =========================
 # ❌ УДАЛЕНИЕ
-# =======================
+# =========================
 
 @router.callback_query(lambda c: c.data == "delete")
 async def delete_profile(call: CallbackQuery):
-    await call.message.answer("Точно удалить?", reply_markup=confirm_delete_kb())
+    await call.message.answer("Точно удалить анкету?", reply_markup=confirm_delete_kb())
 
 
 @router.callback_query(lambda c: c.data == "delete_yes")
@@ -196,4 +226,4 @@ async def confirm_delete(call: CallbackQuery):
 
 @router.callback_query(lambda c: c.data == "delete_no")
 async def cancel_delete(call: CallbackQuery):
-    await call.message.answer("👌 Отмена")
+    await call.message.answer("👌 Удаление отменено")
