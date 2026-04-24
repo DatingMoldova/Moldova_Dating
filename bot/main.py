@@ -11,22 +11,18 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    try:
-        bot = Bot(
-            token=BOT_TOKEN,
-            default=DefaultBotProperties(parse_mode="HTML")
-        )
+    bot = Bot(
+        token=BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode="HTML")
+    )
 
-        dp = Dispatcher()
+    dp = Dispatcher()
 
-        setup_routers(dp)
+    setup_routers(dp)
 
-        print("🚀 Bot started")
+    print("🚀 Bot started")
 
-        await dp.start_polling(bot)
-
-    except Exception as e:
-        print("💥 ERROR:", e)
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
