@@ -61,12 +61,13 @@ async def profile(message: Message, state: FSMContext):
 
     add_view(message.from_user.id)
 
-    balance = user[8] or 0
-    premium = 1 if user[9] else 0
-    invites = user[10] or 0
-    views = user[13] or 0
-    likes = user[14] or 0
-    rep = user[15] or 0
+    # ✅ безопасные значения (НЕ ПАДАЕТ)
+    balance = user[8] if len(user) > 8 and user[8] else 0
+    premium = 1 if len(user) > 9 and user[9] else 0
+    invites = user[10] if len(user) > 10 and user[10] else 0
+    views = user[13] if len(user) > 13 and user[13] else 0
+    likes = user[14] if len(user) > 14 and user[14] else 0
+    rep = user[15] if len(user) > 15 and user[15] else 0
 
     text = (
         f"👤 <b>{user[1]}, {user[2]}</b>\n\n"
@@ -113,6 +114,10 @@ async def edit_menu(call: CallbackQuery, state: FSMContext):
 @router.callback_query(lambda c: c.data.startswith("edit_"))
 async def edit_fields(call: CallbackQuery, state: FSMContext):
     field = call.data.split("_")[1]
+
+    # ✅ защита от падения
+    if not hasattr(EditProfile, field):
+        return await call.message.answer("❌ Ошибка")
 
     await state.set_state(getattr(EditProfile, field))
     await call.message.answer("✏️ Введите новое значение")
