@@ -123,6 +123,7 @@ async def get_gender(call: CallbackQuery, state: FSMContext):
     await state.update_data(gender=mapping.get(call.data))
     await call.message.edit_text("❤️ Кого ищете?", reply_markup=search_kb())
     await state.set_state(Register.search)
+    await call.answer()
 
 
 # =========================
@@ -141,6 +142,7 @@ async def get_search(call: CallbackQuery, state: FSMContext):
     await state.update_data(search=mapping.get(call.data))
     await call.message.edit_text("📝 О себе:")
     await state.set_state(Register.about)
+    await call.answer()
 
 
 # =========================
@@ -178,25 +180,22 @@ async def get_photo(message: Message, state: FSMContext):
     )
 
 
-# =========================
-# ❌ НЕ ФОТО
-# =========================
-
 @router.message(Register.photo)
 async def no_photo(message: Message):
     await message.answer("❌ Отправьте фото")
 
 
 # =========================
-# ✅ ПОДТВЕРЖДЕНИЕ (ФИКС)
+# ✅ ФИКС ПОДТВЕРЖДЕНИЯ
 # =========================
 
-@router.callback_query(F.data.in_(["confirm_yes", "confirm_no"]))
+@router.callback_query(F.data.startswith("confirm"))
 async def confirm(call: CallbackQuery, state: FSMContext):
+    await call.answer()  # 🔥 обязательно
 
     if call.data == "confirm_no":
         await state.clear()
-        return await call.message.edit_text("❌ Отменено")
+        return await call.message.answer("❌ Отменено")
 
     data = await state.get_data()
 
