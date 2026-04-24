@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from bot.db import get_user
 from bot.config import REQUIRED_CHANNEL, CHANNEL_LINK
-from bot.handlers.register import start_reg
+from bot.handlers.register import start_register  # ✅ ИСПРАВЛЕНО
 
 router = Router()
 
@@ -40,15 +40,15 @@ async def start(message: Message, state: FSMContext):
         from bot.keyboards.main_menu import main_menu
         await message.answer("Добро пожаловать 👇", reply_markup=main_menu)
     else:
-        # 🔥 новая регистрация (без мусора)
-        await start_reg(message, state)
+        # 🔥 регистрация
+        await start_register(message, state)  # ✅ ИСПРАВЛЕНО
 
 
-# 🔁 проверка подписки кнопкой
+# 🔁 проверка подписки
 @router.callback_query(lambda c: c.data == "check_sub")
 async def check_again(call: CallbackQuery, state: FSMContext):
     if await check_sub(call.bot, call.from_user.id):
         await call.message.answer("✅ Подписка подтверждена")
-        await start_reg(call.message, state)
+        await start_register(call.message, state)  # ✅ ИСПРАВЛЕНО
     else:
         await call.answer("❌ Сначала подпишитесь", show_alert=True)
