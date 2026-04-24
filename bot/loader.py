@@ -1,31 +1,10 @@
-from aiogram import Dispatcher
-
-# 🔥 все роутеры
 from bot.handlers.start import router as start_router
 from bot.handlers.register import router as register_router
 from bot.handlers.profile import router as profile_router
 from bot.handlers.admin import router as admin_router
-from bot.handlers.agreement import router as agreement_router
-from bot.handlers.support import router as support_router
-from bot.handlers.about import router as about_router
-from bot.handlers.help import router as help_router
-from bot.handlers.premium import router as premium_router
-from bot.handlers.likes import router as likes_router
 
-from bot.handlers.menu import router as menu_router
-
-
-def setup_routers(dp: Dispatcher):
-    # 🔥 порядок важен
+def setup_routers(dp):
     dp.include_router(start_router)
     dp.include_router(register_router)
     dp.include_router(profile_router)
     dp.include_router(admin_router)
-    dp.include_router(support_router)
-    dp.include_router(agreement_router)
-    dp.include_router(about_router)
-    dp.include_router(help_router)
-    dp.include_router(premium_router)
-    dp.include_router(likes_router)
-    
-    dp.include_router(menu_router)
