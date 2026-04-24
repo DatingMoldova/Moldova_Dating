@@ -1,16 +1,18 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
-from bot.db import save_user
-from bot.keyboards.main_menu import main_menu
-from bot.keyboards.register_kb import gender_kb, search_kb, back_kb, confirm_kb
+from bot.db import save_user, get_user
+from bot.utils.logger import log_profile
+
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 router = Router()
 
 
-class Reg(StatesGroup):
+# 🔥 СТЕЙТЫ
+class Register(StatesGroup):
     name = State()
     age = State()
     city = State()
@@ -18,241 +20,165 @@ class Reg(StatesGroup):
     search = State()
     about = State()
     photo = State()
+    confirm = State()
 
 
-def step(text, num):
-    return f"📋 Шаг {num}/6\n\n{text}"
+# 🔘 КНОПКИ
+def gender_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👨 Парень", callback_data="male"),
+                InlineKeyboardButton(text="👩 Девушка", callback_data="female")
+            ]
+        ]
+    )
 
 
-# 🚀 старт
-async def start_reg(message: Message, state: FSMContext):
-    msg = await message.answer(step("👤 Введите ваше имя:", 1))
-    await state.update_data(msg_id=msg.message_id)
-    await state.set_state(Reg.name)
+def search_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👨 Парней", callback_data="search_male"),
+                InlineKeyboardButton(text="👩 Девушек", callback_data="search_female")
+            ]
+        ]
+    )
 
 
-# 👤 имя
-@router.message(Reg.name)
-async def reg_name(message: Message, state: FSMContext):
-    data = await state.get_data()
+def confirm_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Да", callback_data="confirm_yes"),
+                InlineKeyboardButton(text="❌ Нет", callback_data="confirm_no")
+            ]
+        ]
+    )
 
+
+# 🚀 СТАРТ РЕГИСТРАЦИИ
+@router.message(F.text == "🚀 Регистрация")
+async def start_register(message: Message, state: FSMContext):
+    await state.clear()
+
+    await message.answer("👤 Введите ваше имя:")
+    await state.set_state(Register.name)
+
+
+# 👤 ИМЯ
+@router.message(Register.name)
+async def get_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
-
-    await message.bot.edit_message_text(
-        step("🎂 Введите возраст (16+):", 2),
-        chat_id=message.chat.id,
-        message_id=data["msg_id"],
-        reply_markup=back_kb()
-    )
-
-    await state.set_state(Reg.age)
-    await message.delete()
+    await message.answer("🎂 Введите возраст:")
+    await state.set_state(Register.age)
 
 
-# 🎂 возраст
-@router.message(Reg.age)
-async def reg_age(message: Message, state: FSMContext):
-    if not message.text.isdigit() or int(message.text) < 16:
-        await message.answer("❌ Введите корректный возраст (16+)")
-        return
+# 🎂 ВОЗРАСТ
+@router.message(Register.age)
+async def get_age(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        return await message.answer("❌ Введите число")
 
-    data = await state.get_data()
     await state.update_data(age=int(message.text))
-
-    await message.bot.edit_message_text(
-        step("📍 Введите город:", 3),
-        chat_id=message.chat.id,
-        message_id=data["msg_id"],
-        reply_markup=back_kb()
-    )
-
-    await state.set_state(Reg.city)
-    await message.delete()
+    await message.answer("📍 Ваш город:")
+    await state.set_state(Register.city)
 
 
-# 📍 город
-@router.message(Reg.city)
-async def reg_city(message: Message, state: FSMContext):
-    data = await state.get_data()
+# 📍 ГОРОД
+@router.message(Register.city)
+async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
-
-    await message.bot.edit_message_text(
-        step("🚻 Выберите пол:", 4),
-        chat_id=message.chat.id,
-        message_id=data["msg_id"],
-        reply_markup=gender_kb()
-    )
-
-    await state.set_state(Reg.gender)
-    await message.delete()
+    await message.answer("👤 Ваш пол:", reply_markup=gender_kb())
+    await state.set_state(Register.gender)
 
 
-# 🚻 пол
-@router.callback_query(Reg.gender)
-async def reg_gender(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+# 👤 ПОЛ
+@router.callback_query(Register.gender)
+async def get_gender(call: CallbackQuery, state: FSMContext):
+    gender = "Парень" if call.data == "male" else "Девушка"
 
-    mapping = {
-        "g_male": "👨 Мужчина",
-        "g_female": "👩 Женщина",
-        "g_pair": "👫 Пара",
-        "g_bi": "⚧ Би"
-    }
-
-    if call.data not in mapping:
-        return
-
-    await state.update_data(gender=mapping[call.data])
-
-    await call.message.edit_text(
-        step("❤️ Кого ищете:", 5),
-        reply_markup=search_kb()
-    )
-
-    await state.set_state(Reg.search)
+    await state.update_data(gender=gender)
+    await call.message.edit_text("❤️ Кого ищете?", reply_markup=search_kb())
+    await state.set_state(Register.search)
 
 
-# ❤️ поиск
-@router.callback_query(Reg.search)
-async def reg_search(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+# ❤️ КОГО ИЩЕМ
+@router.callback_query(Register.search)
+async def get_search(call: CallbackQuery, state: FSMContext):
+    search = "Парней" if call.data == "search_male" else "Девушек"
 
-    mapping = {
-        "s_male": "👨 Мужчину",
-        "s_female": "👩 Девушку",
-        "s_pair": "👫 Пару",
-        "s_bi": "⚧ Би",
-        "s_all": "🌍 Всех"
-    }
-
-    if call.data not in mapping:
-        return
-
-    await state.update_data(search=mapping[call.data])
-
-    await call.message.edit_text(
-        step("📝 Напишите о себе:", 6),
-        reply_markup=back_kb()
-    )
-
-    await state.set_state(Reg.about)
+    await state.update_data(search=search)
+    await call.message.edit_text("📝 Расскажите о себе:")
+    await state.set_state(Register.about)
 
 
-# 📝 о себе
-@router.message(Reg.about)
-async def reg_about(message: Message, state: FSMContext):
-    data = await state.get_data()
+# 📝 О СЕБЕ
+@router.message(Register.about)
+async def get_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
-
-    await message.bot.edit_message_text(
-        "📸 Отправьте фото:",
-        chat_id=message.chat.id,
-        message_id=data["msg_id"]
-    )
-
-    await state.set_state(Reg.photo)
-    await message.delete()
+    await message.answer("📸 Отправьте фото:")
+    await state.set_state(Register.photo)
 
 
-# 📸 фото → ПРЕДПРОСМОТР
-@router.message(Reg.photo)
-async def reg_photo(message: Message, state: FSMContext):
-    if not message.photo:
-        await message.answer("❌ Отправьте фото")
-        return
+# 📸 ФОТО
+@router.message(Register.photo, F.photo)
+async def get_photo(message: Message, state: FSMContext):
+    photo_id = message.photo[-1].file_id
+    await state.update_data(photo=photo_id)
 
     data = await state.get_data()
-
-    photo = message.photo[-1].file_id
-    await state.update_data(photo=photo)
 
     text = (
-        f"👤 {data.get('name')}, {data.get('age')}\n"
-        f"📍 {data.get('city')}\n\n"
-        f"{data.get('gender')} → {data.get('search')}\n\n"
-        f"📝 {data.get('about')}"
+        "📋 <b>Проверьте анкету</b>\n\n"
+
+        f"👤 {data['name']}, {data['age']}\n"
+        f"📍 {data['city']}\n\n"
+        f"{data['gender']} ищет {data['search']}\n\n"
+        f"📝 {data['about']}"
     )
 
     await message.answer_photo(
-        photo=photo,
+        photo=photo_id,
         caption=text,
         reply_markup=confirm_kb()
     )
 
-    await message.delete()
+    await state.set_state(Register.confirm)
 
 
-# ✅ подтвердить
-@router.callback_query(F.data == "confirm_yes")
-async def confirm_yes(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+# ❌ ЕСЛИ НЕ ФОТО
+@router.message(Register.photo)
+async def no_photo(message: Message):
+    await message.answer("❌ Отправьте фото")
 
-    try:
-        data = await state.get_data()
 
-        save_user(
-            call.from_user.id,
-            data.get("name"),
-            data.get("age"),
-            data.get("city"),
-            data.get("gender"),
-            data.get("search"),
-            data.get("about"),
-            data.get("photo"),
-            call.from_user.username,
-            None
-        )
-
-        await call.message.delete()
-
-        await call.message.answer(
-            "✅ Анкета сохранена!",
-            reply_markup=main_menu
-        )
-
+# ✅ ПОДТВЕРЖДЕНИЕ
+@router.callback_query(Register.confirm)
+async def confirm(call: CallbackQuery, state: FSMContext):
+    if call.data == "confirm_no":
         await state.clear()
+        return await call.message.edit_text("❌ Регистрация отменена")
 
-    except Exception as e:
-        await call.message.answer(f"❌ Ошибка: {e}")
+    data = await state.get_data()
 
+    save_user(
+        user_id=call.from_user.id,
+        name=data["name"],
+        age=data["age"],
+        city=data["city"],
+        gender=data["gender"],
+        search=data["search"],
+        about=data["about"],
+        photo=data["photo"],
+        username=call.from_user.username,
+        referrer=None
+    )
 
-# ❌ заново
-@router.callback_query(F.data == "confirm_no")
-async def confirm_no(call: CallbackQuery, state: FSMContext):
-    await call.answer()
+    # 🔥 ЛОГ В ГРУППУ
+    user = get_user(call.from_user.id)
+    await log_profile(call.bot, user)
 
     await state.clear()
-    await call.message.delete()
 
-    await call.message.answer("🔄 Начнём заново")
-
-    from bot.handlers.register import start_reg
-    await start_reg(call.message, state)
-
-
-# ⬅️ назад
-@router.callback_query(F.data == "back")
-async def go_back(call: CallbackQuery, state: FSMContext):
-    await call.answer()
-
-    current = await state.get_state()
-
-    if current == Reg.age.state:
-        await state.set_state(Reg.name)
-        await call.message.edit_text(step("👤 Введите имя:", 1))
-
-    elif current == Reg.city.state:
-        await state.set_state(Reg.age)
-        await call.message.edit_text(step("🎂 Введите возраст:", 2), reply_markup=back_kb())
-
-    elif current == Reg.gender.state:
-        await state.set_state(Reg.city)
-        await call.message.edit_text(step("📍 Введите город:", 3), reply_markup=back_kb())
-
-    elif current == Reg.search.state:
-        await state.set_state(Reg.gender)
-        await call.message.edit_text(step("🚻 Выберите пол:", 4), reply_markup=gender_kb())
-
-    elif current == Reg.about.state:
-        await state.set_state(Reg.search)
-        await call.message.edit_text(step("❤️ Кого ищете:", 5), reply_markup=search_kb())
+    await call.message.edit_text("✅ Анкета сохранена!")
