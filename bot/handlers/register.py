@@ -179,6 +179,7 @@ async def confirm(call: CallbackQuery, state: FSMContext):
         return await call.message.edit_text("❌ Регистрация отменена")
 
     data = await state.get_data()
+    referrer = data.get("referrer")
 
     save_user(
         user_id=call.from_user.id,
@@ -190,13 +191,34 @@ async def confirm(call: CallbackQuery, state: FSMContext):
         about=data["about"],
         photo=data["photo"],
         username=call.from_user.username,
-        referrer=None
+        referrer=referrer
     )
 
-    # 🔥 ЛОГ В ГРУППУ
+    # 🔥 ЛОГ
     user = get_user(call.from_user.id)
     await log_profile(call.bot, user)
 
-    await state.clear()
+    # 🧹 удалить сообщение
+    await call.message.delete()
 
-    await call.message.edit_text("✅ Анкета сохранена!")
+    # 👤 показать анкету
+    text = (
+        f"👤 <b>{data['name']}, {data['age']}</b>\n"
+        f"📍 {data['city']}\n\n"
+        f"{data['gender']} ищет {data['search']}\n\n"
+        f"📝 {data['about']}"
+    )
+
+    await call.message.answer_photo(
+        photo=data["photo"],
+        caption=text
+    )
+
+    from bot.keyboards.main_menu import main_menu
+
+    await call.message.answer(
+        "🎉 Регистрация завершена!",
+        reply_markup=main_menu()
+    )
+
+    await state.clear()
