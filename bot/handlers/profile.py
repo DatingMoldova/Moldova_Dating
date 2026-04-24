@@ -50,8 +50,11 @@ def confirm_delete_kb():
 # 👤 ПРОФИЛЬ
 # =========================
 
+from aiogram.fsm.context import FSMContext
+
 @router.message(F.text == "👤 Моя анкета")
-async def profile(message: Message):
+async def profile(message: Message, state: FSMContext):
+    await state.clear()
     user = get_user(message.from_user.id)
 
     if not user:
