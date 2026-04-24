@@ -9,6 +9,7 @@ from bot.handlers.support import router as support_router
 from bot.handlers.about import router as about_router
 from bot.handlers.help import router as help_router
 from bot.handlers.premium import router as premium_router
+from bot.handlers.likes import router as likes_router
 
 from bot.handlers.menu import router as menu_router
 
@@ -23,5 +24,6 @@ def setup_routers(dp: Dispatcher):
     dp.include_router(about_router)
     dp.include_router(help_router)
     dp.include_router(premium_router)
+    dp.include_router(likes_router)
     
     dp.include_router(menu_router)
