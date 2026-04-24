@@ -3,10 +3,14 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
-from bot.db import create_user, get_user
+from bot.db import create_user
 
 router = Router()
 
+
+# =========================
+# 🔥 FSM
+# =========================
 
 class Register(StatesGroup):
     name = State()
@@ -16,8 +20,11 @@ class Register(StatesGroup):
     search = State()
     about = State()
     photo = State()
-    confirm = State()
 
+
+# =========================
+# 🔘 КНОПКИ
+# =========================
 
 def gender_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -54,11 +61,19 @@ def confirm_kb():
     ])
 
 
+# =========================
+# 🚀 СТАРТ
+# =========================
+
 async def start_register(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("👤 Введите имя:")
     await state.set_state(Register.name)
 
+
+# =========================
+# 👤 ИМЯ
+# =========================
 
 @router.message(Register.name)
 async def get_name(message: Message, state: FSMContext):
@@ -66,6 +81,10 @@ async def get_name(message: Message, state: FSMContext):
     await message.answer("🎂 Возраст:")
     await state.set_state(Register.age)
 
+
+# =========================
+# 🎂 ВОЗРАСТ
+# =========================
 
 @router.message(Register.age)
 async def get_age(message: Message, state: FSMContext):
@@ -77,12 +96,20 @@ async def get_age(message: Message, state: FSMContext):
     await state.set_state(Register.city)
 
 
+# =========================
+# 📍 ГОРОД
+# =========================
+
 @router.message(Register.city)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await message.answer("👤 Пол:", reply_markup=gender_kb())
     await state.set_state(Register.gender)
 
+
+# =========================
+# 👤 ПОЛ
+# =========================
 
 @router.callback_query(Register.gender)
 async def get_gender(call: CallbackQuery, state: FSMContext):
@@ -98,6 +125,10 @@ async def get_gender(call: CallbackQuery, state: FSMContext):
     await state.set_state(Register.search)
 
 
+# =========================
+# ❤️ КОГО ИЩЕТ
+# =========================
+
 @router.callback_query(Register.search)
 async def get_search(call: CallbackQuery, state: FSMContext):
     mapping = {
@@ -112,12 +143,20 @@ async def get_search(call: CallbackQuery, state: FSMContext):
     await state.set_state(Register.about)
 
 
+# =========================
+# 📝 О СЕБЕ
+# =========================
+
 @router.message(Register.about)
 async def get_about(message: Message, state: FSMContext):
     await state.update_data(about=message.text)
     await message.answer("📸 Фото:")
     await state.set_state(Register.photo)
 
+
+# =========================
+# 📸 ФОТО
+# =========================
 
 @router.message(Register.photo, F.photo)
 async def get_photo(message: Message, state: FSMContext):
@@ -138,10 +177,21 @@ async def get_photo(message: Message, state: FSMContext):
         reply_markup=confirm_kb()
     )
 
-    await state.set_state(Register.confirm)
+
+# =========================
+# ❌ НЕ ФОТО
+# =========================
+
+@router.message(Register.photo)
+async def no_photo(message: Message):
+    await message.answer("❌ Отправьте фото")
 
 
-@router.callback_query(Register.confirm)
+# =========================
+# ✅ ПОДТВЕРЖДЕНИЕ (ФИКС)
+# =========================
+
+@router.callback_query(F.data.in_(["confirm_yes", "confirm_no"]))
 async def confirm(call: CallbackQuery, state: FSMContext):
 
     if call.data == "confirm_no":
@@ -149,6 +199,9 @@ async def confirm(call: CallbackQuery, state: FSMContext):
         return await call.message.edit_text("❌ Отменено")
 
     data = await state.get_data()
+
+    if not data:
+        return await call.message.answer("❌ Ошибка, начни заново /start")
 
     create_user(
         user_id=call.from_user.id,
@@ -161,7 +214,10 @@ async def confirm(call: CallbackQuery, state: FSMContext):
         photo=data["photo"]
     )
 
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except:
+        pass
 
     await call.message.answer_photo(
         photo=data["photo"],
@@ -170,6 +226,9 @@ async def confirm(call: CallbackQuery, state: FSMContext):
 
     from bot.keyboards.main_menu import main_menu
 
-    await call.message.answer("🎉 Готово", reply_markup=main_menu)
+    await call.message.answer(
+        "🎉 Регистрация завершена!",
+        reply_markup=main_menu
+    )
 
     await state.clear()
